@@ -1,20 +1,30 @@
 import { motion } from 'framer-motion';
-import { FaBell, FaUserCircle } from 'react-icons/fa';
+import { FaBell, FaUserCircle, FaSignOutAlt } from 'react-icons/fa';
 import { HiMenu } from 'react-icons/hi';
+import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const Navbar = ({ sidebarOpen, setSidebarOpen }) => {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
   return (
     <motion.nav
       initial={{ y: -100 }}
       animate={{ y: 0 }}
       transition={{ duration: 0.5 }}
-      className="bg-white shadow-md h-14 sm:h-16 flex items-center justify-between px-3 sm:px-4 md:px-6 fixed top-0 left-0 right-0 z-40 border-b border-gray-200"
+      className="bg-white  h-14 sm:h-16 flex items-center justify-between px-3 sm:px-4 md:px-6 fixed top-0 left-0 right-0 z-40 border-b border-gray-200"
     >
       <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
-        {/* Hamburger Menu Button - Always visible to open sidebar */}
+        {/* Hamburger Menu Button - Only visible on mobile/tablet */}
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="p-2 text-gray-700 hover:text-green-600 hover:bg-gray-100 rounded-lg transition-colors"
+          className="lg:hidden p-2 text-gray-700 hover:text-green-600 hover:bg-gray-100 rounded-lg transition-colors"
           aria-label="Toggle sidebar"
         >
           <HiMenu className="text-xl sm:text-2xl" />
@@ -40,10 +50,20 @@ const Navbar = ({ sidebarOpen, setSidebarOpen }) => {
             <FaUserCircle className="text-base sm:text-lg md:text-xl" />
           </div>
           <div className="text-xs sm:text-sm hidden sm:block">
-            <p className="font-semibold text-gray-900 whitespace-nowrap">Admin User</p>
-            <p className="text-gray-600 text-xs whitespace-nowrap hidden md:block">admin@dolabb.com</p>
+            <p className="font-semibold text-gray-900 whitespace-nowrap">{user?.name || 'Admin User'}</p>
+            <p className="text-gray-600 text-xs whitespace-nowrap hidden md:block">{user?.email || 'admin@dolabb.com'}</p>
           </div>
         </div>
+
+        {/* Logout Button */}
+        <button
+          onClick={handleLogout}
+          className="p-2 text-gray-700 hover:text-red-600 hover:bg-gray-100 rounded-lg transition-colors"
+          aria-label="Logout"
+          title="Logout"
+        >
+          <FaSignOutAlt className="text-base sm:text-lg md:text-xl" />
+        </button>
       </div>
     </motion.nav>
   );

@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion';
+import { useEffect, useState } from 'react';
 import { FaBox, FaChartBar, FaUsers } from 'react-icons/fa';
 import { HiX } from 'react-icons/hi';
 import { MdGavel, MdNotifications, MdPayment } from 'react-icons/md';
@@ -14,14 +15,28 @@ const menuItems = [
 ];
 
 const Sidebar = ({ isOpen, setIsOpen }) => {
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  useEffect(() => {
+    const checkScreenSize = () => {
+      setIsDesktop(window.innerWidth >= 1024);
+    };
+
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
+
   const handleLinkClick = () => {
-    // Always close sidebar when a link is clicked
-    setIsOpen(false);
+    // Close sidebar on mobile/tablet when a link is clicked
+    if (!isDesktop) {
+      setIsOpen(false);
+    }
   };
 
   return (
     <>
-      {/* Overlay - Shows on all screen sizes when sidebar is open */}
+      {/* Overlay - Only shows on mobile/tablet when sidebar is open */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
@@ -29,21 +44,21 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
-            className='fixed inset-0 bg-black/50 z-40'
+            className='fixed inset-0 bg-black/50 z-40 lg:hidden'
             onClick={() => setIsOpen(false)}
           />
         )}
       </AnimatePresence>
 
-      {/* Sidebar - Always fixed, overlays on top */}
+      {/* Sidebar */}
       <motion.aside
         initial={false}
         animate={{
-          x: isOpen ? 0 : -256,
+          x: isDesktop ? 0 : isOpen ? 0 : -256,
         }}
         transition={{ duration: 0.3, ease: 'easeInOut' }}
-        className={`fixed left-0 top-0 h-full bg-white shadow-2xl text-gray-900 z-50 border-r border-gray-200 ${
-          isOpen ? 'w-64' : 'w-0'
+        className={`fixed left-0 top-0 lg:top-16 lg:h-[calc(100vh-4rem)] h-full bg-white text-gray-900 z-50 lg:z-auto border-r border-gray-200 ${
+          isOpen ? 'w-64' : 'w-0 lg:w-64'
         } overflow-hidden`}
       >
         <div className='flex flex-col h-full w-64'>
@@ -57,14 +72,16 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
                 Dashboard
               </p>
             </div>
-            {/* Close (X) Button - Always visible when sidebar is open */}
-            <button
-              onClick={() => setIsOpen(false)}
-              className='p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0 ml-2'
-              aria-label='Close sidebar'
-            >
-              <HiX className='text-xl' />
-            </button>
+            {/* Close (X) Button - Only visible on mobile/tablet when sidebar is open */}
+            {isOpen && (
+              <button
+                onClick={() => setIsOpen(false)}
+                className='lg:hidden p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0 ml-2'
+                aria-label='Close sidebar'
+              >
+                <HiX className='text-xl' />
+              </button>
+            )}
           </div>
 
           {/* Navigation */}
