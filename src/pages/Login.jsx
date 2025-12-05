@@ -17,23 +17,18 @@ const Login = () => {
     setError('');
     setLoading(true);
     
-    // Simulate login verification
-    setTimeout(() => {
-      // In real app, verify credentials with backend
-      if (password.length < 6) {
-        setError('Invalid credentials. Please try again.');
-        setLoading(false);
-        return;
+    try {
+      const result = await login(email, password);
+      if (result.success) {
+        navigate('/');
+      } else {
+        setError(result.error || 'Invalid credentials. Please try again.');
       }
-      
-      const userData = {
-        email: email,
-        name: 'Admin User',
-      };
-      login(userData);
-      navigate('/');
+    } catch (err) {
+      setError('An error occurred. Please try again.');
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   return (

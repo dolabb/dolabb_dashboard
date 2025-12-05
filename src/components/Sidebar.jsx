@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
-import { FaBox, FaChartBar, FaUsers, FaHandshake } from 'react-icons/fa';
+import { FaBox, FaChartBar, FaUsers, FaHandshake, FaImage } from 'react-icons/fa';
 import { HiX } from 'react-icons/hi';
 import { MdGavel, MdNotifications, MdPayment } from 'react-icons/md';
 import { NavLink } from 'react-router-dom';
@@ -13,6 +13,7 @@ const menuItems = [
   { path: '/disputes', label: 'Disputes & Complaints', icon: MdGavel },
   { path: '/notifications', label: 'Notifications', icon: MdNotifications },
   { path: '/affiliates', label: 'Affiliate Management', icon: FaHandshake },
+  { path: '/hero-section', label: 'Hero Section', icon: FaImage },
 ];
 
 const Sidebar = ({ isOpen, setIsOpen }) => {
@@ -58,21 +59,13 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
           x: isDesktop ? 0 : isOpen ? 0 : -256,
         }}
         transition={{ duration: 0.3, ease: 'easeInOut' }}
-        className={`fixed left-0 top-0 lg:top-16 lg:h-[calc(100vh-4rem)] h-full bg-white text-gray-900 z-50 lg:z-auto border-r border-gray-200 ${
+        className={`fixed left-0 top-0 lg:h-screen h-full bg-white text-gray-900 z-50 lg:z-auto border-r border-gray-200 ${
           isOpen ? 'w-64' : 'w-0 lg:w-64'
         } overflow-hidden`}
       >
         <div className='flex flex-col h-full w-64'>
           {/* Logo/Header */}
-          <div className='p-4 sm:p-6 border-b border-gray-200 flex items-center justify-between flex-shrink-0'>
-            <div className='flex-1 min-w-0'>
-              <h1 className='text-xl sm:text-2xl font-bold text-green-600 whitespace-nowrap'>
-                Dolabb Admin
-              </h1>
-              <p className='text-xs sm:text-sm text-gray-600 mt-1 whitespace-nowrap'>
-                Dashboard
-              </p>
-            </div>
+          <div className='p-4 sm:p-6 mt-10  flex items-center justify-between flex-shrink-0'>
             {/* Close (X) Button - Only visible on mobile/tablet when sidebar is open */}
             {isOpen && (
               <button

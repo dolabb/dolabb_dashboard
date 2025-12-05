@@ -1,33 +1,101 @@
 import { motion } from 'framer-motion';
-import { useState } from 'react';
-import { disputes } from '../data/dummyData';
+import { useState, useEffect } from 'react';
+import {
+  getDisputes,
+  updateDispute,
+  closeDispute,
+} from '../services/api';
 
 const DisputeManagement = () => {
   const [selectedDispute, setSelectedDispute] = useState(null);
   const [filter, setFilter] = useState('all');
+  const [disputes, setDisputes] = useState([]);
   const [adminNote, setAdminNote] = useState('');
   const [resolution, setResolution] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [pagination, setPagination] = useState({ currentPage: 1, totalPages: 1, totalItems: 0 });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [actionLoading, setActionLoading] = useState(null);
 
-  const filteredDisputes = filter === 'all' 
-    ? disputes 
-    : disputes.filter(dispute => dispute.status === filter);
+  useEffect(() => {
+    fetchDisputes();
+  }, [currentPage, filter]);
 
-  const handleAction = (disputeId, action) => {
-    console.log(`Action: ${action} on dispute ${disputeId}`);
-    alert(`Action: ${action} on dispute ${disputeId} - Ready for API integration`);
+  const fetchDisputes = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const status = filter === 'all' ? null : filter;
+      const response = await getDisputes(currentPage, 20, status);
+      if (response.success) {
+        setDisputes(response.disputes || []);
+        setPagination(response.pagination || { currentPage: 1, totalPages: 1, totalItems: 0 });
+      } else {
+        setError(response.error || 'Failed to load disputes');
+      }
+    } catch (err) {
+      setError('An error occurred while loading disputes');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const saveDisputeUpdate = () => {
-    if (selectedDispute) {
-      console.log('Updating dispute:', {
-        id: selectedDispute.id,
-        adminNote,
-        resolution,
-      });
-      alert('Dispute updated - Ready for API integration');
-      setSelectedDispute(null);
-      setAdminNote('');
-      setResolution('');
+  const handleAction = async (disputeId, action) => {
+    if (action === 'resolve' || action === 'mark_resolved') {
+      setSelectedDispute(disputes.find(d => (d._id || d.id) === disputeId));
+      return;
+    }
+  };
+
+  const saveDisputeUpdate = async () => {
+    if (!selectedDispute) return;
+
+    setActionLoading(selectedDispute._id || selectedDispute.id);
+    try {
+      const updateData = {};
+      if (adminNote) updateData.adminNotes = adminNote;
+      if (resolution) updateData.resolution = resolution;
+      if (selectedDispute.status !== 'resolved') {
+        updateData.status = 'resolved';
+      }
+
+      const response = await updateDispute(selectedDispute._id || selectedDispute.id, updateData);
+      if (response.success) {
+        alert('Dispute updated successfully');
+        setSelectedDispute(null);
+        setAdminNote('');
+        setResolution('');
+        fetchDisputes();
+      } else {
+        alert(response.error || 'Failed to update dispute');
+      }
+    } catch (err) {
+      alert('An error occurred while updating dispute');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleCloseDispute = async () => {
+    if (!selectedDispute) return;
+
+    setActionLoading(selectedDispute._id || selectedDispute.id);
+    try {
+      const response = await closeDispute(selectedDispute._id || selectedDispute.id, resolution || undefined);
+      if (response.success) {
+        alert('Dispute closed successfully');
+        setSelectedDispute(null);
+        setAdminNote('');
+        setResolution('');
+        fetchDisputes();
+      } else {
+        alert(response.error || 'Failed to close dispute');
+      }
+    } catch (err) {
+      alert('An error occurred while closing dispute');
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -68,11 +136,17 @@ const DisputeManagement = () => {
         <p className="text-gray-600 text-sm sm:text-base whitespace-nowrap">Manage user complaints and disputes</p>
       </motion.div>
 
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+          {error}
+        </div>
+      )}
+
       {/* Filters */}
       <div className="bg-white rounded-lg shadow-md p-4 border border-gray-200">
         <div className="flex gap-2 sm:gap-4 flex-wrap">
           <button
-            onClick={() => setFilter('all')}
+            onClick={() => { setFilter('all'); setCurrentPage(1); }}
             className={`px-3 sm:px-4 py-2 rounded-lg transition-colors text-sm sm:text-base whitespace-nowrap ${
               filter === 'all' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
@@ -80,7 +154,7 @@ const DisputeManagement = () => {
             All Disputes
           </button>
           <button
-            onClick={() => setFilter('open')}
+            onClick={() => { setFilter('open'); setCurrentPage(1); }}
             className={`px-3 sm:px-4 py-2 rounded-lg transition-colors text-sm sm:text-base whitespace-nowrap ${
               filter === 'open' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
@@ -88,7 +162,7 @@ const DisputeManagement = () => {
             Open
           </button>
           <button
-            onClick={() => setFilter('resolved')}
+            onClick={() => { setFilter('resolved'); setCurrentPage(1); }}
             className={`px-3 sm:px-4 py-2 rounded-lg transition-colors text-sm sm:text-base whitespace-nowrap ${
               filter === 'resolved' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
@@ -100,22 +174,36 @@ const DisputeManagement = () => {
 
       {/* Disputes Table */}
       <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto" style={{ maxWidth: '100%' }}>
-          <table className="w-full min-w-[1000px]">
-            <thead className="bg-gray-50 text-gray-900">
-              <tr>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold uppercase whitespace-nowrap">Case Number</th>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold uppercase whitespace-nowrap">Type</th>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold uppercase whitespace-nowrap">Buyer</th>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold uppercase whitespace-nowrap">Seller</th>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold uppercase whitespace-nowrap">Item</th>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold uppercase whitespace-nowrap">Status</th>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold uppercase whitespace-nowrap">Date</th>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold uppercase whitespace-nowrap">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {filteredDisputes.map((dispute, index) => (
+        {loading ? (
+          <div className="p-8 text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading disputes...</p>
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto" style={{ maxWidth: '100%' }}>
+              <table className="w-full min-w-[1000px]">
+                <thead className="bg-gray-50 text-gray-900">
+                  <tr>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold uppercase whitespace-nowrap">Case Number</th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold uppercase whitespace-nowrap">Type</th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold uppercase whitespace-nowrap">Buyer</th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold uppercase whitespace-nowrap">Seller</th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold uppercase whitespace-nowrap">Item</th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold uppercase whitespace-nowrap">Status</th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold uppercase whitespace-nowrap">Date</th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold uppercase whitespace-nowrap">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {disputes.length === 0 ? (
+                    <tr>
+                      <td colSpan="8" className="px-4 sm:px-6 py-8 text-center text-gray-500">
+                        No disputes found
+                      </td>
+                    </tr>
+                  ) : (
+                    disputes.map((dispute, index) => (
                 <motion.tr
                   key={dispute.id}
                   initial={{ opacity: 0, x: -20 }}
@@ -128,36 +216,59 @@ const DisputeManagement = () => {
                     setResolution(dispute.resolution || '');
                   }}
                 >
-                  <td className="px-4 sm:px-6 py-4 font-semibold text-blue-600 whitespace-nowrap">{dispute.caseNumber}</td>
-                  <td className="px-4 sm:px-6 py-4">{getTypeBadge(dispute.type)}</td>
-                  <td className="px-4 sm:px-6 py-4 text-sm text-gray-700 whitespace-nowrap">{dispute.buyer}</td>
-                  <td className="px-4 sm:px-6 py-4 text-sm text-gray-700 whitespace-nowrap">{dispute.seller}</td>
-                  <td className="px-4 sm:px-6 py-4 text-sm text-gray-700 whitespace-nowrap">{dispute.item}</td>
-                  <td className="px-4 sm:px-6 py-4">{getStatusBadge(dispute.status)}</td>
-                  <td className="px-4 sm:px-6 py-4 text-sm text-gray-600 whitespace-nowrap">{dispute.createdAt}</td>
-                  <td className="px-4 sm:px-6 py-4">
-                    <div className="flex gap-2">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleAction(dispute.id, 'chat'); }}
-                        className="px-2 sm:px-3 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 whitespace-nowrap"
-                      >
-                        Chat
-                      </button>
-                      {dispute.status === 'open' && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleAction(dispute.id, 'resolve'); }}
-                          className="px-2 sm:px-3 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600 whitespace-nowrap"
-                        >
-                          Resolve
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </motion.tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                      <td className="px-4 sm:px-6 py-4 font-semibold text-blue-600 whitespace-nowrap">{dispute.caseNumber || 'N/A'}</td>
+                      <td className="px-4 sm:px-6 py-4">{getTypeBadge(dispute.type || 'item_not_received')}</td>
+                      <td className="px-4 sm:px-6 py-4 text-sm text-gray-700 whitespace-nowrap">{dispute.buyerName || 'N/A'}</td>
+                      <td className="px-4 sm:px-6 py-4 text-sm text-gray-700 whitespace-nowrap">{dispute.SellerName || 'N/A'}</td>
+                      <td className="px-4 sm:px-6 py-4 text-sm text-gray-700 whitespace-nowrap">{dispute.itemTitle || 'N/A'}</td>
+                      <td className="px-4 sm:px-6 py-4">{getStatusBadge(dispute.status || 'open')}</td>
+                      <td className="px-4 sm:px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
+                        {dispute.createdAt ? new Date(dispute.createdAt).toLocaleDateString() : 'N/A'}
+                      </td>
+                      <td className="px-4 sm:px-6 py-4">
+                        <div className="flex gap-2">
+                          {dispute.status === 'open' && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleAction(dispute._id || dispute.id, 'resolve'); }}
+                              className="px-2 sm:px-3 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600 whitespace-nowrap"
+                            >
+                              Resolve
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </motion.tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {/* Pagination */}
+            {pagination.totalPages > 1 && (
+              <div className="px-4 sm:px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+                <div className="text-sm text-gray-700">
+                  Showing page {pagination.currentPage} of {pagination.totalPages} ({pagination.totalItems} total)
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(p => Math.min(pagination.totalPages, p + 1))}
+                    disabled={currentPage === pagination.totalPages}
+                    className="px-3 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* Dispute Details Modal */}
@@ -237,18 +348,17 @@ const DisputeManagement = () => {
             <div className="flex gap-2 sm:gap-4 flex-wrap">
               <button
                 onClick={saveDisputeUpdate}
-                className="px-4 sm:px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors whitespace-nowrap text-sm sm:text-base"
+                disabled={actionLoading === (selectedDispute._id || selectedDispute.id)}
+                className="px-4 sm:px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors whitespace-nowrap text-sm sm:text-base disabled:opacity-50"
               >
-                Save Updates
+                {actionLoading === (selectedDispute._id || selectedDispute.id) ? 'Saving...' : 'Save Updates'}
               </button>
               <button
-                onClick={() => {
-                  handleAction(selectedDispute.id, 'mark_resolved');
-                  setSelectedDispute(null);
-                }}
-                className="px-4 sm:px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors whitespace-nowrap text-sm sm:text-base"
+                onClick={handleCloseDispute}
+                disabled={actionLoading === (selectedDispute._id || selectedDispute.id)}
+                className="px-4 sm:px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors whitespace-nowrap text-sm sm:text-base disabled:opacity-50"
               >
-                Mark as Resolved
+                {actionLoading === (selectedDispute._id || selectedDispute.id) ? 'Closing...' : 'Close Dispute'}
               </button>
               <button
                 onClick={() => setSelectedDispute(null)}

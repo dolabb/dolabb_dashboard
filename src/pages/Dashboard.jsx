@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { gsap } from 'gsap';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   FaBox,
   FaChartLine,
@@ -28,12 +28,14 @@ import {
   YAxis,
 } from 'recharts';
 import {
-  cashoutRequests,
-  dashboardStats,
-  disputes,
-  listings,
-  transactions,
-} from '../data/dummyData';
+  getDashboardStats,
+  getRevenueTrends,
+  getSalesOverTime,
+  getListingsStatus,
+  getTransactionTypes,
+  getDisputesStatus,
+  getCashoutRequestsSummary,
+} from '../services/api';
 
 const StatCard = ({ title, value, icon: Icon, color, delay = 0 }) => (
   <motion.div
@@ -64,6 +66,17 @@ const StatCard = ({ title, value, icon: Icon, color, delay = 0 }) => (
 
 const Dashboard = () => {
   const titleRef = useRef(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [dashboardData, setDashboardData] = useState({
+    stats: null,
+    revenueTrends: null,
+    salesOverTime: null,
+    listingsStatus: null,
+    transactionTypes: null,
+    disputesStatus: null,
+    cashoutSummary: null,
+  });
 
   useEffect(() => {
     if (titleRef.current) {
@@ -76,152 +89,209 @@ const Dashboard = () => {
     }
   }, []);
 
-  // Generate time series data for revenue and users
-  const revenueData = [
-    { month: 'Jan', revenue: 850000, users: 8500 },
-    { month: 'Feb', revenue: 920000, users: 9200 },
-    { month: 'Mar', revenue: 980000, users: 9800 },
-    { month: 'Apr', revenue: 1050000, users: 10500 },
-    { month: 'May', revenue: 1120000, users: 11200 },
-    { month: 'Jun', revenue: 1180000, users: 11800 },
-    { month: 'Jul', revenue: 1200000, users: 12000 },
-    { month: 'Aug', revenue: 1220000, users: 12200 },
-    { month: 'Sep', revenue: 1235000, users: 12350 },
-    { month: 'Oct', revenue: 1245000, users: 12420 },
-    { month: 'Nov', revenue: 1250000, users: 12450 },
-  ];
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      setLoading(true);
+      setError(null);
+      
+      try {
+        const [
+          stats,
+          revenueTrends,
+          salesOverTime,
+          listingsStatus,
+          transactionTypes,
+          disputesStatus,
+          cashoutSummary,
+        ] = await Promise.all([
+          getDashboardStats(),
+          getRevenueTrends(),
+          getSalesOverTime(),
+          getListingsStatus(),
+          getTransactionTypes(),
+          getDisputesStatus(),
+          getCashoutRequestsSummary(),
+        ]);
 
-  // Listings status breakdown
-  const listingsStatusData = [
-    {
-      name: 'Active',
-      value: listings.filter(l => l.status === 'active').length,
-      color: '#10b981',
-    },
-    {
-      name: 'Sold',
-      value: listings.filter(l => l.status === 'sold').length,
-      color: '#3b82f6',
-    },
-    {
-      name: 'Removed',
-      value: listings.filter(l => l.status === 'removed').length,
-      color: '#ef4444',
-    },
-  ];
+        setDashboardData({
+          stats: stats.success ? stats : null,
+          revenueTrends: revenueTrends.success ? revenueTrends : null,
+          salesOverTime: salesOverTime.success ? salesOverTime : null,
+          listingsStatus: listingsStatus.success ? listingsStatus : null,
+          transactionTypes: transactionTypes.success ? transactionTypes : null,
+          disputesStatus: disputesStatus.success ? disputesStatus : null,
+          cashoutSummary: cashoutSummary.success ? cashoutSummary : null,
+        });
+      } catch (err) {
+        console.error('Error fetching dashboard data:', err);
+        setError('Failed to load dashboard data. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  // Transaction types breakdown
-  const transactionTypesData = [
-    {
-      name: 'Purchase',
-      value: transactions.filter(t => t.type === 'purchase').length,
-      color: '#10b981',
-    },
-    {
-      name: 'Offer',
-      value: transactions.filter(t => t.type === 'offer').length,
-      color: '#f59e0b',
-    },
-    {
-      name: 'Accepted Offer',
-      value: transactions.filter(t => t.type === 'accepted_offer').length,
-      color: '#3b82f6',
-    },
-  ];
+    fetchDashboardData();
+  }, []);
 
-  // Disputes status
+  // Format revenue trends data
+  const revenueData = dashboardData.revenueTrends?.monthlyRevenue?.map((item) => {
+    const monthName = new Date(item.month + '-01').toLocaleDateString('en-US', { month: 'short' });
+    const usersData = dashboardData.revenueTrends?.monthlyNewUsers?.find(
+      (u) => u.month === item.month
+    );
+    return {
+      month: monthName,
+      revenue: item.revenue || 0,
+      users: usersData?.newUsers || 0,
+    };
+  }) || [];
+
+  // Format listings status data
+  const listingsStatusData = dashboardData.listingsStatus
+    ? [
+        {
+          name: 'Active',
+          value: dashboardData.listingsStatus.activeListings || 0,
+          color: '#10b981',
+        },
+        {
+          name: 'Sold',
+          value: dashboardData.listingsStatus.soldListings || 0,
+          color: '#3b82f6',
+        },
+        {
+          name: 'Removed',
+          value: dashboardData.listingsStatus.removedListings || 0,
+          color: '#ef4444',
+        },
+        {
+          name: 'Pending Review',
+          value: dashboardData.listingsStatus.pendingReviewListings || 0,
+          color: '#f59e0b',
+        },
+      ]
+    : [];
+
+  // Format transaction types data
+  const transactionTypesData = dashboardData.transactionTypes
+    ? [
+        {
+          name: 'Purchase',
+          value: dashboardData.transactionTypes.purchaseTransactions || 0,
+          color: '#10b981',
+        },
+        {
+          name: 'Offer',
+          value: dashboardData.transactionTypes.offerTransactions || 0,
+          color: '#f59e0b',
+        },
+        {
+          name: 'Accepted Offer',
+          value: dashboardData.transactionTypes.acceptedOfferTransactions || 0,
+          color: '#3b82f6',
+        },
+      ]
+    : [];
+
+  // Format disputes status data
   const disputesData = [
     {
       name: 'Open',
-      value: disputes.filter(d => d.status === 'open').length,
+      value: dashboardData.disputesStatus?.openDisputes || 0,
       color: '#ef4444',
     },
     {
       name: 'Resolved',
-      value: disputes.filter(d => d.status === 'resolved').length,
+      value: dashboardData.disputesStatus?.resolvedDisputes || 0,
       color: '#10b981',
+    },
+    {
+      name: 'Closed',
+      value: dashboardData.disputesStatus?.closedDisputes || 0,
+      color: '#6b7280',
     },
   ];
 
-  // Sales over time
-  const salesData = [
-    { month: 'Jan', sales: 180 },
-    { month: 'Feb', sales: 195 },
-    { month: 'Mar', sales: 210 },
-    { month: 'Apr', sales: 220 },
-    { month: 'May', sales: 230 },
-    { month: 'Jun', sales: 235 },
-    { month: 'Jul', sales: 238 },
-    { month: 'Aug', sales: 240 },
-    { month: 'Sep', sales: 242 },
-    { month: 'Oct', sales: 243 },
-    { month: 'Nov', sales: 234 },
-  ];
+  // Format sales over time data
+  const salesData = dashboardData.salesOverTime?.monthlySales?.map((item) => {
+    const monthName = new Date(item.month + '-01').toLocaleDateString('en-US', { month: 'short' });
+    return {
+      month: monthName,
+      sales: item.sales || 0,
+    };
+  }) || [];
 
-  // Cashout requests by status
+  // Format cashout requests data
   const cashoutData = [
     {
       name: 'Pending',
-      value: cashoutRequests.filter(c => c.status === 'pending').length,
+      value: dashboardData.cashoutSummary?.pendingCashouts || 0,
       color: '#f59e0b',
     },
     {
       name: 'Approved',
-      value: cashoutRequests.filter(c => c.status === 'approved').length,
+      value: dashboardData.cashoutSummary?.approvedCashouts || 0,
       color: '#10b981',
+    },
+    {
+      name: 'Rejected',
+      value: dashboardData.cashoutSummary?.rejectedCashouts || 0,
+      color: '#ef4444',
     },
   ];
 
-  const stats = [
-    {
-      title: 'Active Users',
-      value: dashboardStats.activeUsers,
-      icon: FaUsers,
-      color: 'text-green-600',
-    },
-    {
-      title: 'Total Listings',
-      value: dashboardStats.totalListings,
-      icon: FaBox,
-      color: 'text-blue-600',
-    },
-    {
-      title: 'Active Listings',
-      value: dashboardStats.activeListings,
-      icon: FaCheckCircle,
-      color: 'text-green-600',
-    },
-    {
-      title: 'Total Sales',
-      value: dashboardStats.totalSales,
-      icon: FaShoppingCart,
-      color: 'text-yellow-600',
-    },
-    {
-      title: 'Pending Cashouts',
-      value: dashboardStats.pendingCashouts,
-      icon: FaClock,
-      color: 'text-red-600',
-    },
-    {
-      title: 'Total Revenue',
-      value: `$${dashboardStats.totalRevenue.toLocaleString()}`,
-      icon: FaMoneyBillWave,
-      color: 'text-green-600',
-    },
-    {
-      title: 'Open Disputes',
-      value: dashboardStats.disputesOpen,
-      icon: FaGavel,
-      color: 'text-red-600',
-    },
-    {
-      title: 'Resolved Disputes',
-      value: dashboardStats.disputesResolved,
-      icon: FaCheckCircle,
-      color: 'text-green-600',
-    },
-  ];
+  const stats = dashboardData.stats
+    ? [
+        {
+          title: 'Total Users',
+          value: dashboardData.stats.totalUsers || 0,
+          icon: FaUsers,
+          color: 'text-blue-600',
+        },
+        {
+          title: 'Active Users',
+          value: dashboardData.stats.activeUsers || 0,
+          icon: FaUsers,
+          color: 'text-green-600',
+        },
+        {
+          title: 'Total Listings',
+          value: dashboardData.stats.totalListings || 0,
+          icon: FaBox,
+          color: 'text-blue-600',
+        },
+        {
+          title: 'Total Sales',
+          value: dashboardData.stats['Total Sales'] || 0,
+          icon: FaShoppingCart,
+          color: 'text-yellow-600',
+        },
+        {
+          title: 'Total Revenue',
+          value: `$${(dashboardData.stats.totalRevenue || 0).toLocaleString()}`,
+          icon: FaMoneyBillWave,
+          color: 'text-green-600',
+        },
+        {
+          title: 'Pending Cashouts',
+          value: dashboardData.stats.pendingCashouts || 0,
+          icon: FaClock,
+          color: 'text-red-600',
+        },
+        {
+          title: 'Open Disputes',
+          value: dashboardData.stats['Open Disputes'] || 0,
+          icon: FaGavel,
+          color: 'text-red-600',
+        },
+        {
+          title: 'Resolved Disputes',
+          value: dashboardData.stats.resolvedDisputes || 0,
+          icon: FaCheckCircle,
+          color: 'text-green-600',
+        },
+      ]
+    : [];
 
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
@@ -248,6 +318,27 @@ const Dashboard = () => {
     }
     return null;
   };
+
+  if (loading) {
+    return (
+      <div className='flex items-center justify-center min-h-screen'>
+        <div className='text-center'>
+          <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4'></div>
+          <p className='text-gray-600'>Loading dashboard data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className='space-y-4 sm:space-y-6'>
+        <div className='bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg'>
+          {error}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className='space-y-4 sm:space-y-6'>
@@ -348,9 +439,6 @@ const Dashboard = () => {
                 cx='50%'
                 cy='50%'
                 labelLine={false}
-                label={({ name, percent }) =>
-                  `${name}: ${(percent * 100).toFixed(0)}%`
-                }
                 outerRadius={80}
                 fill='#8884d8'
                 dataKey='value'
@@ -359,7 +447,21 @@ const Dashboard = () => {
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip 
+                content={<CustomTooltip />}
+                formatter={(value, name, props) => [
+                  `${value} (${((value / listingsStatusData.reduce((sum, item) => sum + item.value, 0)) * 100).toFixed(1)}%)`,
+                  name
+                ]}
+              />
+              <Legend 
+                wrapperStyle={{ paddingTop: '20px' }}
+                formatter={(value, entry) => {
+                  const total = listingsStatusData.reduce((sum, item) => sum + item.value, 0);
+                  const percent = total > 0 ? ((entry.payload.value / total) * 100).toFixed(0) : 0;
+                  return `${value}: ${percent}%`;
+                }}
+              />
             </PieChart>
           </ResponsiveContainer>
         </motion.div>
@@ -416,9 +518,6 @@ const Dashboard = () => {
                 cx='50%'
                 cy='50%'
                 labelLine={false}
-                label={({ name, percent }) =>
-                  `${name}: ${(percent * 100).toFixed(0)}%`
-                }
                 outerRadius={80}
                 fill='#8884d8'
                 dataKey='value'
@@ -427,7 +526,22 @@ const Dashboard = () => {
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip 
+                content={<CustomTooltip />}
+                formatter={(value, name, props) => {
+                  const total = disputesData.reduce((sum, item) => sum + item.value, 0);
+                  const percent = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                  return [`${value} (${percent}%)`, name];
+                }}
+              />
+              <Legend 
+                wrapperStyle={{ paddingTop: '20px' }}
+                formatter={(value, entry) => {
+                  const total = disputesData.reduce((sum, item) => sum + item.value, 0);
+                  const percent = total > 0 ? ((entry.payload.value / total) * 100).toFixed(0) : 0;
+                  return `${value}: ${percent}%`;
+                }}
+              />
             </PieChart>
           </ResponsiveContainer>
         </motion.div>
@@ -450,9 +564,6 @@ const Dashboard = () => {
                 cx='50%'
                 cy='50%'
                 labelLine={false}
-                label={({ name, percent }) =>
-                  `${name}: ${(percent * 100).toFixed(0)}%`
-                }
                 outerRadius={80}
                 fill='#8884d8'
                 dataKey='value'
@@ -461,7 +572,22 @@ const Dashboard = () => {
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip 
+                content={<CustomTooltip />}
+                formatter={(value, name, props) => {
+                  const total = cashoutData.reduce((sum, item) => sum + item.value, 0);
+                  const percent = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                  return [`${value} (${percent}%)`, name];
+                }}
+              />
+              <Legend 
+                wrapperStyle={{ paddingTop: '20px' }}
+                formatter={(value, entry) => {
+                  const total = cashoutData.reduce((sum, item) => sum + item.value, 0);
+                  const percent = total > 0 ? ((entry.payload.value / total) * 100).toFixed(0) : 0;
+                  return `${value}: ${percent}%`;
+                }}
+              />
             </PieChart>
           </ResponsiveContainer>
         </motion.div>

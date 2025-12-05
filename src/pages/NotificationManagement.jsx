@@ -1,11 +1,22 @@
-import { motion } from 'framer-motion';
-import { useState } from 'react';
-import { FaEdit, FaPaperPlane, FaTimes, FaCheck } from 'react-icons/fa';
-import { notifications, termsAndConditions, notificationTemplates } from '../data/dummyData';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect } from 'react';
+import { FaEdit, FaPaperPlane, FaTimes, FaCheck, FaPlus } from 'react-icons/fa';
+import {
+  getNotifications,
+  getNotificationTemplates,
+  createNotification,
+  updateNotification,
+  deleteNotification,
+  sendNotification,
+  toggleNotificationStatus,
+} from '../services/api';
 
 const NotificationManagement = () => {
-  const [activeTab, setActiveTab] = useState('notifications');
-  const [notificationsList, setNotificationsList] = useState(notifications);
+  const [notificationCategory, setNotificationCategory] = useState('all'); // 'all', 'buyer', 'seller', 'affiliate'
+  const [notificationsList, setNotificationsList] = useState([]);
+  const [notificationTemplates, setNotificationTemplates] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [newNotification, setNewNotification] = useState({
     type: 'system_alert',
     title: '',
@@ -17,9 +28,47 @@ const NotificationManagement = () => {
   const [editingNotification, setEditingNotification] = useState(null);
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [templateVariables, setTemplateVariables] = useState({});
-  const [termsContent, setTermsContent] = useState(termsAndConditions.content);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [showSendModal, setShowSendModal] = useState(false);
   const [sendNotificationData, setSendNotificationData] = useState(null);
+  const [pagination, setPagination] = useState({ currentPage: 1, totalPages: 1, totalItems: 0 });
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    fetchNotifications();
+    fetchTemplates();
+  }, [currentPage, notificationCategory]);
+
+  const fetchNotifications = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const type = notificationCategory !== 'all' ? (notificationCategory === 'buyer' ? 'buyer_message' : notificationCategory === 'seller' ? 'seller_message' : 'affiliate_message') : null;
+      const targetAudience = notificationCategory !== 'all' ? notificationCategory : null;
+      const response = await getNotifications(currentPage, 20, type, targetAudience);
+      if (response.success) {
+        setNotificationsList(response.notifications || []);
+        setPagination(response.pagination || { currentPage: 1, totalPages: 1, totalItems: 0 });
+      } else {
+        setError(response.error || 'Failed to load notifications');
+      }
+    } catch (err) {
+      setError('An error occurred while loading notifications');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchTemplates = async () => {
+    try {
+      const response = await getNotificationTemplates();
+      if (response.success) {
+        setNotificationTemplates(response.templates || {});
+      }
+    } catch (err) {
+      console.error('Error fetching templates:', err);
+    }
+  };
 
   // Group templates by category
   const templateCategories = {
@@ -39,6 +88,14 @@ const NotificationManagement = () => {
       'seller_payment_received',
       'seller_shipment_reminder',
       'seller_feedback_received',
+    ],
+    affiliate_journey: [
+      'affiliate_registration',
+      'affiliate_referral_success',
+      'affiliate_commission_earned',
+      'affiliate_payout_approved',
+      'affiliate_payout_rejected',
+      'affiliate_milestone_reached',
     ],
   };
 
@@ -95,7 +152,7 @@ const NotificationManagement = () => {
     return result;
   };
 
-  const handleCreateNotification = () => {
+  const handleCreateNotification = async () => {
     if (!newNotification.title || !newNotification.message) {
       alert('Please fill in all required fields');
       return;
@@ -106,29 +163,38 @@ const NotificationManagement = () => {
       templateVariables
     );
 
-    const notification = {
-      id: notificationsList.length + 1,
+    const notificationData = {
       ...newNotification,
       message: finalMessage,
-      createdAt: new Date().toISOString().split('T')[0],
     };
 
-    setNotificationsList([...notificationsList, notification]);
-    alert('Notification created successfully!');
-    setNewNotification({
-      type: 'system_alert',
-      title: '',
-      message: '',
-      targetAudience: 'all',
-      active: true,
-      template: '',
-    });
-    setSelectedTemplate('');
-    setTemplateVariables({});
+    try {
+      const response = await createNotification(notificationData);
+      if (response.success) {
+        alert('Notification created successfully!');
+        setNewNotification({
+          type: 'system_alert',
+          title: '',
+          message: '',
+          targetAudience: 'all',
+          active: true,
+          template: '',
+        });
+        setSelectedTemplate('');
+        setTemplateVariables({});
+        setShowCreateModal(false);
+        fetchNotifications();
+      } else {
+        alert(response.error || 'Failed to create notification');
+      }
+    } catch (err) {
+      alert('An error occurred while creating notification');
+    }
   };
 
   const handleEditNotification = (notification) => {
     setEditingNotification({ ...notification });
+    setShowCreateModal(true);
     // Find if it's from a template
     const templateKey = Object.keys(notificationTemplates).find(
       (key) =>
@@ -141,21 +207,28 @@ const NotificationManagement = () => {
     }
   };
 
-  const handleUpdateNotification = () => {
+  const handleUpdateNotification = async () => {
     if (!editingNotification.title || !editingNotification.message) {
       alert('Please fill in all required fields');
       return;
     }
 
-    setNotificationsList(
-      notificationsList.map((n) =>
-        n.id === editingNotification.id ? editingNotification : n
-      )
-    );
-    alert('Notification updated successfully!');
-    setEditingNotification(null);
-    setSelectedTemplate('');
-    setTemplateVariables({});
+    try {
+      const notificationId = editingNotification.id || editingNotification._id;
+      const response = await updateNotification(notificationId, editingNotification);
+      if (response.success) {
+        alert('Notification updated successfully!');
+        setEditingNotification(null);
+        setSelectedTemplate('');
+        setTemplateVariables({});
+        setShowCreateModal(false);
+        fetchNotifications();
+      } else {
+        alert(response.error || 'Failed to update notification');
+      }
+    } catch (err) {
+      alert('An error occurred while updating notification');
+    }
   };
 
   const handleSendNotification = (notification) => {
@@ -163,35 +236,77 @@ const NotificationManagement = () => {
     setShowSendModal(true);
   };
 
-  const confirmSendNotification = () => {
+  const confirmSendNotification = async () => {
     if (!sendNotificationData) return;
 
-    // In a real app, this would send the notification via API
-    console.log('Sending notification:', sendNotificationData);
-    alert(
-      `Notification "${sendNotificationData.title}" sent to ${sendNotificationData.targetAudience}!`
-    );
-    setShowSendModal(false);
-    setSendNotificationData(null);
-  };
-
-  const handleToggleNotification = (id) => {
-    setNotificationsList(
-      notificationsList.map((n) =>
-        n.id === id ? { ...n, active: !n.active } : n
-      )
-    );
-  };
-
-  const handleDeleteNotification = (id) => {
-    if (window.confirm('Are you sure you want to delete this notification?')) {
-      setNotificationsList(notificationsList.filter((n) => n.id !== id));
+    try {
+      const notificationId = sendNotificationData.id || sendNotificationData._id;
+      const response = await sendNotification(notificationId, true);
+      if (response.success) {
+        alert(
+          `Notification "${sendNotificationData.title}" sent to ${sendNotificationData.targetAudience}!`
+        );
+        setShowSendModal(false);
+        setSendNotificationData(null);
+        fetchNotifications();
+      } else {
+        alert(response.error || 'Failed to send notification');
+      }
+    } catch (err) {
+      alert('An error occurred while sending notification');
     }
   };
 
-  const saveTermsAndConditions = () => {
-    console.log('Saving terms and conditions:', termsContent);
-    alert('Terms and conditions saved - Ready for API integration');
+  const handleToggleNotification = async (id) => {
+    try {
+      const notification = notificationsList.find((n) => (n.id || n._id) === id);
+      const newActiveStatus = !notification?.active;
+      const response = await toggleNotificationStatus(id, newActiveStatus);
+      if (response.success) {
+        fetchNotifications();
+      } else {
+        alert(response.error || 'Failed to toggle notification status');
+      }
+    } catch (err) {
+      alert('An error occurred while toggling notification status');
+    }
+  };
+
+  const handleDeleteNotification = async (id) => {
+    if (window.confirm('Are you sure you want to delete this notification?')) {
+      try {
+        const response = await deleteNotification(id);
+        if (response.success) {
+          alert('Notification deleted successfully!');
+          fetchNotifications();
+        } else {
+          alert(response.error || 'Failed to delete notification');
+        }
+      } catch (err) {
+        alert('An error occurred while deleting notification');
+      }
+    }
+  };
+
+
+  // Filter notifications based on selected category
+  const getFilteredNotifications = () => {
+    if (notificationCategory === 'all') {
+      return notificationsList;
+    } else if (notificationCategory === 'buyer') {
+      return notificationsList.filter(
+        (n) => n.type === 'buyer_message' || n.targetAudience === 'buyers'
+      );
+    } else if (notificationCategory === 'seller') {
+      return notificationsList.filter(
+        (n) => n.type === 'seller_message' || n.targetAudience === 'sellers'
+      );
+    } else if (notificationCategory === 'affiliate') {
+      return notificationsList.filter(
+        (n) => n.type === 'affiliate_message' || n.targetAudience === 'affiliates'
+      );
+    }
+    return notificationsList;
   };
 
   return (
@@ -201,244 +316,125 @@ const NotificationManagement = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 whitespace-nowrap">
-          Notifications & Communication
-        </h1>
-        <p className="text-gray-600 text-sm sm:text-base whitespace-nowrap">
-          Manage system messages, alerts, and terms & conditions
-        </p>
-      </motion.div>
-
-      {/* Tabs */}
-      <div className="bg-white rounded-lg shadow-md p-4 border border-gray-200">
-        <div className="flex gap-2 sm:gap-4 border-b border-gray-200 overflow-x-auto">
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 whitespace-nowrap">
+              Notifications
+            </h1>
+            <p className="text-gray-600 text-sm sm:text-base whitespace-nowrap">
+              Manage system messages and alerts
+            </p>
+          </div>
           <button
-            onClick={() => setActiveTab('notifications')}
-            className={`px-3 sm:px-4 py-2 font-semibold transition-colors whitespace-nowrap text-sm sm:text-base ${
-              activeTab === 'notifications'
-                ? 'text-green-600 border-b-2 border-green-600'
-                : 'text-gray-600 hover:text-green-600'
-            }`}
+            onClick={() => {
+              setEditingNotification(null);
+              setNewNotification({
+                type: 'system_alert',
+                title: '',
+                message: '',
+                targetAudience: 'all',
+                active: true,
+                template: '',
+              });
+              setSelectedTemplate('');
+              setTemplateVariables({});
+              setShowCreateModal(true);
+            }}
+            className="px-4 sm:px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors whitespace-nowrap flex items-center gap-2 font-semibold"
           >
-            Notifications
-          </button>
-          <button
-            onClick={() => setActiveTab('terms')}
-            className={`px-3 sm:px-4 py-2 font-semibold transition-colors whitespace-nowrap text-sm sm:text-base ${
-              activeTab === 'terms'
-                ? 'text-green-600 border-b-2 border-green-600'
-                : 'text-gray-600 hover:text-green-600'
-            }`}
-          >
-            Terms & Conditions
+            <FaPlus /> Create New Notification
           </button>
         </div>
-      </div>
+      </motion.div>
 
-      {/* Notifications Tab */}
-      {activeTab === 'notifications' && (
-        <div className="space-y-4 sm:space-y-6">
-          {/* Create/Edit New Notification */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-lg shadow-md p-4 sm:p-6 border border-gray-200"
-          >
-            <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-4 whitespace-nowrap">
-              {editingNotification ? 'Edit Notification' : 'Create New Notification'}
-            </h2>
-            <div className="space-y-4">
-              {/* Template Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2 whitespace-nowrap">
-                  Select Template (Optional)
-                </label>
-                <select
-                  value={selectedTemplate}
-                  onChange={(e) => handleTemplateSelect(e.target.value)}
-                  className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
-                >
-                  <option value="">Custom Notification</option>
-                  <optgroup label="Account Management">
-                    {templateCategories.account.map((key) => (
-                      <option key={key} value={key}>
-                        {getTemplateDisplayName(key)}
-                      </option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Buyer Journey">
-                    {templateCategories.buyer_journey.map((key) => (
-                      <option key={key} value={key}>
-                        {getTemplateDisplayName(key)}
-                      </option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Seller Journey">
-                    {templateCategories.seller_journey.map((key) => (
-                      <option key={key} value={key}>
-                        {getTemplateDisplayName(key)}
-                      </option>
-                    ))}
-                  </optgroup>
-                </select>
-              </div>
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+          {error}
+        </div>
+      )}
 
-              {/* Template Variables */}
-              {Object.keys(templateVariables).length > 0 && (
-                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                  <label className="block text-sm font-medium text-gray-700 mb-2 whitespace-nowrap">
-                    Template Variables
-                  </label>
-                  <div className="space-y-2">
-                    {Object.keys(templateVariables).map((key) => (
-                      <div key={key}>
-                        <label className="block text-xs text-gray-600 mb-1 whitespace-nowrap">
-                          {key.replace(/([A-Z])/g, ' $1').trim()}
-                        </label>
-                        <input
-                          type="text"
-                          value={templateVariables[key]}
-                          onChange={(e) =>
-                            setTemplateVariables({
-                              ...templateVariables,
-                              [key]: e.target.value,
-                            })
-                          }
-                          className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 text-sm"
-                          placeholder={`Enter ${key}`}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2 whitespace-nowrap">
-                  Type
-                </label>
-                <select
-                  value={editingNotification?.type || newNotification.type}
-                  onChange={(e) =>
-                    editingNotification
-                      ? setEditingNotification({
-                          ...editingNotification,
-                          type: e.target.value,
-                        })
-                      : setNewNotification({
-                          ...newNotification,
-                          type: e.target.value,
-                        })
-                  }
-                  className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
-                >
-                  <option value="system_alert">System Alert</option>
-                  <option value="seller_message">Seller Message</option>
-                  <option value="buyer_message">Buyer Message</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2 whitespace-nowrap">
-                  Title
-                </label>
-                <input
-                  type="text"
-                  value={editingNotification?.title || newNotification.title}
-                  onChange={(e) =>
-                    editingNotification
-                      ? setEditingNotification({
-                          ...editingNotification,
-                          title: e.target.value,
-                        })
-                      : setNewNotification({
-                          ...newNotification,
-                          title: e.target.value,
-                        })
-                  }
-                  className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
-                  placeholder="Notification title"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2 whitespace-nowrap">
-                  Message
-                </label>
-                <textarea
-                  value={editingNotification?.message || newNotification.message}
-                  onChange={(e) =>
-                    editingNotification
-                      ? setEditingNotification({
-                          ...editingNotification,
-                          message: e.target.value,
-                        })
-                      : setNewNotification({
-                          ...newNotification,
-                          message: e.target.value,
-                        })
-                  }
-                  className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
-                  rows="4"
-                  placeholder="Notification message"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2 whitespace-nowrap">
-                  Target Audience
-                </label>
-                <select
-                  value={
-                    editingNotification?.targetAudience ||
-                    newNotification.targetAudience
-                  }
-                  onChange={(e) =>
-                    editingNotification
-                      ? setEditingNotification({
-                          ...editingNotification,
-                          targetAudience: e.target.value,
-                        })
-                      : setNewNotification({
-                          ...newNotification,
-                          targetAudience: e.target.value,
-                        })
-                  }
-                  className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
-                >
-                  <option value="all">All Users</option>
-                  <option value="sellers">Sellers Only</option>
-                  <option value="buyers">Buyers Only</option>
-                </select>
-              </div>
-              <div className="flex gap-2">
-                {editingNotification ? (
-                  <>
-                    <button
-                      onClick={handleUpdateNotification}
-                      className="px-4 sm:px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors whitespace-nowrap flex items-center gap-2"
-                    >
-                      <FaCheck /> Update Notification
-                    </button>
-                    <button
-                      onClick={() => {
-                        setEditingNotification(null);
-                        setSelectedTemplate('');
-                        setTemplateVariables({});
-                      }}
-                      className="px-4 sm:px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors whitespace-nowrap flex items-center gap-2"
-                    >
-                      <FaTimes /> Cancel
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    onClick={handleCreateNotification}
-                    className="px-4 sm:px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors whitespace-nowrap"
-                  >
-                    Create Notification
-                  </button>
+      <div className="space-y-4 sm:space-y-6">
+          {/* Notification Category Tabs */}
+          <div className="bg-white rounded-lg shadow-md p-4 border border-gray-200">
+            <div className="flex gap-2 sm:gap-4 border-b border-gray-200 overflow-x-auto">
+              <button
+                onClick={() => setNotificationCategory('all')}
+                className={`px-3 sm:px-4 py-2 font-semibold transition-colors whitespace-nowrap text-sm sm:text-base relative ${
+                  notificationCategory === 'all'
+                    ? 'text-green-600'
+                    : 'text-gray-600 hover:text-green-600'
+                }`}
+              >
+                All
+                {notificationCategory === 'all' && (
+                  <motion.div
+                    layoutId="notificationCategoryTab"
+                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-600"
+                  />
                 )}
-              </div>
+                <span className="ml-2 px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full text-xs font-semibold">
+                  {notificationsList.length}
+                </span>
+              </button>
+              <button
+                onClick={() => setNotificationCategory('buyer')}
+                className={`px-3 sm:px-4 py-2 font-semibold transition-colors whitespace-nowrap text-sm sm:text-base relative ${
+                  notificationCategory === 'buyer'
+                    ? 'text-green-600'
+                    : 'text-gray-600 hover:text-green-600'
+                }`}
+              >
+                Buyer
+                {notificationCategory === 'buyer' && (
+                  <motion.div
+                    layoutId="notificationCategoryTab"
+                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-600"
+                  />
+                )}
+                <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-600 rounded-full text-xs font-semibold">
+                  {notificationsList.filter((n) => n.type === 'buyer_message' || n.targetAudience === 'buyers').length}
+                </span>
+              </button>
+              <button
+                onClick={() => setNotificationCategory('seller')}
+                className={`px-3 sm:px-4 py-2 font-semibold transition-colors whitespace-nowrap text-sm sm:text-base relative ${
+                  notificationCategory === 'seller'
+                    ? 'text-green-600'
+                    : 'text-gray-600 hover:text-green-600'
+                }`}
+              >
+                Seller
+                {notificationCategory === 'seller' && (
+                  <motion.div
+                    layoutId="notificationCategoryTab"
+                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-600"
+                  />
+                )}
+                <span className="ml-2 px-2 py-0.5 bg-purple-100 text-purple-600 rounded-full text-xs font-semibold">
+                  {notificationsList.filter((n) => n.type === 'seller_message' || n.targetAudience === 'sellers').length}
+                </span>
+              </button>
+              <button
+                onClick={() => setNotificationCategory('affiliate')}
+                className={`px-3 sm:px-4 py-2 font-semibold transition-colors whitespace-nowrap text-sm sm:text-base relative ${
+                  notificationCategory === 'affiliate'
+                    ? 'text-green-600'
+                    : 'text-gray-600 hover:text-green-600'
+                }`}
+              >
+                Affiliate
+                {notificationCategory === 'affiliate' && (
+                  <motion.div
+                    layoutId="notificationCategoryTab"
+                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-600"
+                  />
+                )}
+                <span className="ml-2 px-2 py-0.5 bg-orange-100 text-orange-600 rounded-full text-xs font-semibold">
+                  {notificationsList.filter((n) => n.type === 'affiliate_message' || n.targetAudience === 'affiliates').length}
+                </span>
+              </button>
             </div>
-          </motion.div>
+          </div>
 
           {/* Existing Notifications */}
           <motion.div
@@ -446,13 +442,21 @@ const NotificationManagement = () => {
             animate={{ opacity: 1, y: 0 }}
             className="bg-white rounded-lg shadow-md overflow-hidden border border-gray-200"
           >
-            <div className="p-4 border-b border-gray-200">
-              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 whitespace-nowrap">
-                Existing Notifications
-              </h2>
-            </div>
-            <div className="divide-y divide-gray-200">
-              {notificationsList.map((notification, index) => (
+            {loading ? (
+              <div className="p-8 text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto mb-4"></div>
+                <p className="text-gray-600">Loading notifications...</p>
+              </div>
+            ) : (
+              <>
+                <div className="p-4 border-b border-gray-200">
+                  <h2 className="text-lg sm:text-xl font-semibold text-gray-900 whitespace-nowrap">
+                    Existing Notifications
+                  </h2>
+                </div>
+                <div className="divide-y divide-gray-200">
+                  {getFilteredNotifications().length > 0 ? (
+                getFilteredNotifications().map((notification, index) => (
                 <motion.div
                   key={notification.id}
                   initial={{ opacity: 0, x: -20 }}
@@ -469,6 +473,8 @@ const NotificationManagement = () => {
                               ? 'bg-blue-100 text-blue-800'
                               : notification.type === 'seller_message'
                               ? 'bg-purple-100 text-purple-800'
+                              : notification.type === 'affiliate_message'
+                              ? 'bg-orange-100 text-orange-800'
                               : 'bg-green-100 text-green-800'
                           }`}
                         >
@@ -511,7 +517,7 @@ const NotificationManagement = () => {
                         <FaEdit /> Edit
                       </button>
                       <button
-                        onClick={() => handleToggleNotification(notification.id)}
+                        onClick={() => handleToggleNotification(notification.id || notification._id)}
                         className={`px-3 sm:px-4 py-2 rounded text-xs font-semibold transition-colors whitespace-nowrap ${
                           notification.active
                             ? 'bg-yellow-500 text-white hover:bg-yellow-600'
@@ -521,7 +527,7 @@ const NotificationManagement = () => {
                         {notification.active ? 'Deactivate' : 'Activate'}
                       </button>
                       <button
-                        onClick={() => handleDeleteNotification(notification.id)}
+                        onClick={() => handleDeleteNotification(notification.id || notification._id)}
                         className="px-3 sm:px-4 py-2 bg-red-500 text-white rounded text-xs font-semibold hover:bg-red-600 transition-colors whitespace-nowrap"
                       >
                         Delete
@@ -529,49 +535,216 @@ const NotificationManagement = () => {
                     </div>
                   </div>
                 </motion.div>
-              ))}
-            </div>
+                ))
+              ) : (
+                <div className="p-8 text-center">
+                  <div className="text-4xl mb-4">🔔</div>
+                  <p className="text-gray-500 text-lg font-medium">
+                    No {notificationCategory === 'all' ? '' : notificationCategory} notifications found
+                  </p>
+                  <p className="text-gray-400 text-sm mt-2">
+                    {notificationCategory === 'all' 
+                      ? 'Create a new notification to get started'
+                      : `No ${notificationCategory} notifications available. Create one to get started.`}
+                  </p>
+                </div>
+              )}
+                </div>
+                {/* Pagination */}
+                {pagination.totalPages > 1 && (
+                  <div className="px-4 sm:px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+                    <div className="text-sm text-gray-700">
+                      Showing page {pagination.currentPage} of {pagination.totalPages} ({pagination.totalItems} total)
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                        className="px-3 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Previous
+                      </button>
+                      <button
+                        onClick={() => setCurrentPage(p => Math.min(pagination.totalPages, p + 1))}
+                        disabled={currentPage === pagination.totalPages}
+                        className="px-3 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </motion.div>
         </div>
-      )}
 
-      {/* Terms & Conditions Tab */}
-      {activeTab === 'terms' && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-lg shadow-md p-4 sm:p-6 border border-gray-200"
-        >
-          <div className="mb-4">
-            <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 whitespace-nowrap">
-                Terms & Conditions
-              </h2>
-              <div className="text-xs sm:text-sm text-gray-600 whitespace-nowrap">
-                Version {termsAndConditions.version} | Last Updated:{' '}
-                {termsAndConditions.lastUpdated}
-              </div>
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2 whitespace-nowrap">
-              Terms & Conditions Content
-            </label>
-            <textarea
-              value={termsContent}
-              onChange={(e) => setTermsContent(e.target.value)}
-              className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent font-mono text-sm text-gray-900"
-              rows="20"
-            />
-          </div>
-          <button
-            onClick={saveTermsAndConditions}
-            className="mt-4 px-4 sm:px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors whitespace-nowrap"
+      {/* Create/Edit Notification Modal */}
+      <AnimatePresence>
+        {showCreateModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+            onClick={() => {
+              setShowCreateModal(false);
+              setEditingNotification(null);
+              setSelectedTemplate('');
+              setTemplateVariables({});
+            }}
           >
-            Save Terms & Conditions
-          </button>
-        </motion.div>
-      )}
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-gray-200"
+            >
+              <div className="sticky top-0 bg-white border-b border-gray-200 p-4 sm:p-6 flex items-center justify-between z-10">
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
+                  {editingNotification ? 'Edit Notification' : 'Create New Notification'}
+                </h2>
+                <button
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    setEditingNotification(null);
+                    setSelectedTemplate('');
+                    setTemplateVariables({});
+                  }}
+                  className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <FaTimes className="text-lg" />
+                </button>
+              </div>
+              <div className="p-4 sm:p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 whitespace-nowrap">
+                    Title
+                  </label>
+                  <input
+                    type="text"
+                    value={editingNotification?.title || newNotification.title}
+                    onChange={(e) =>
+                      editingNotification
+                        ? setEditingNotification({
+                            ...editingNotification,
+                            title: e.target.value,
+                          })
+                        : setNewNotification({
+                            ...newNotification,
+                            title: e.target.value,
+                          })
+                    }
+                    className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
+                    placeholder="Notification title"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 whitespace-nowrap">
+                    Message
+                  </label>
+                  <textarea
+                    value={editingNotification?.message || newNotification.message}
+                    onChange={(e) =>
+                      editingNotification
+                        ? setEditingNotification({
+                            ...editingNotification,
+                            message: e.target.value,
+                          })
+                        : setNewNotification({
+                            ...newNotification,
+                            message: e.target.value,
+                          })
+                    }
+                    className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
+                    rows="4"
+                    placeholder="Notification message"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 whitespace-nowrap">
+                    Target Audience
+                  </label>
+                  <select
+                    value={
+                      editingNotification?.targetAudience ||
+                      newNotification.targetAudience
+                    }
+                    onChange={(e) =>
+                      editingNotification
+                        ? setEditingNotification({
+                            ...editingNotification,
+                            targetAudience: e.target.value,
+                          })
+                        : setNewNotification({
+                            ...newNotification,
+                            targetAudience: e.target.value,
+                          })
+                    }
+                    className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
+                  >
+                    <option value="all">All Users</option>
+                    <option value="sellers">Sellers Only</option>
+                    <option value="buyers">Buyers Only</option>
+                    <option value="affiliates">Affiliates Only</option>
+                  </select>
+                </div>
+                <div className="flex gap-2 pt-4 border-t border-gray-200">
+                  {editingNotification ? (
+                    <>
+                      <button
+                        onClick={handleUpdateNotification}
+                        className="flex-1 px-4 sm:px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors whitespace-nowrap flex items-center justify-center gap-2"
+                      >
+                        <FaCheck /> Update Notification
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowCreateModal(false);
+                          setEditingNotification(null);
+                          setSelectedTemplate('');
+                          setTemplateVariables({});
+                        }}
+                        className="px-4 sm:px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors whitespace-nowrap flex items-center gap-2"
+                      >
+                        <FaTimes /> Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={handleCreateNotification}
+                        className="flex-1 px-4 sm:px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors whitespace-nowrap flex items-center justify-center gap-2"
+                      >
+                        <FaCheck /> Create Notification
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowCreateModal(false);
+                          setNewNotification({
+                            type: 'system_alert',
+                            title: '',
+                            message: '',
+                            targetAudience: 'all',
+                            active: true,
+                            template: '',
+                          });
+                          setSelectedTemplate('');
+                          setTemplateVariables({});
+                        }}
+                        className="px-4 sm:px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors whitespace-nowrap flex items-center gap-2"
+                      >
+                        <FaTimes /> Cancel
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Send Notification Modal */}
       {showSendModal && sendNotificationData && (

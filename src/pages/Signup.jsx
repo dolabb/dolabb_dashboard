@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { FaEnvelope, FaLock, FaUser, FaArrowRight } from 'react-icons/fa';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { adminForgotPassword } from '../services/api';
 
 const Signup = () => {
   const [formData, setFormData] = useState({
@@ -15,8 +16,9 @@ const Signup = () => {
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const [signupError, setSignupError] = useState('');
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { signup, verifyOTP } = useAuth();
 
   const validateForm = () => {
     const newErrors = {};
@@ -59,35 +61,60 @@ const Signup = () => {
     }
     
     setLoading(true);
+    setSignupError('');
     
-    // Simulate OTP sending
-    setTimeout(() => {
-      setOtpSent(true);
+    try {
+      const signupData = {
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        confirm_password: formData.confirmPassword,
+      };
+      
+      const result = await signup(signupData);
+      if (result.success) {
+        setOtpSent(true);
+        // OTP is returned in response.otp for development/testing
+        if (result.data.otp) {
+          console.log('OTP for testing:', result.data.otp);
+        }
+      } else {
+        setSignupError(result.error || 'Signup failed. Please try again.');
+        if (typeof result.error === 'object') {
+          setErrors(result.error);
+        }
+      }
+    } catch (err) {
+      setSignupError('An error occurred. Please try again.');
+    } finally {
       setLoading(false);
-      // In real app, you would send OTP to email/phone here
-    }, 1000);
+    }
   };
 
   const handleVerifyOTP = async (e) => {
     e.preventDefault();
     
-    if (otp.length !== 6) {
-      setErrors({ otp: 'Please enter a valid 6-digit OTP' });
+    if (otp.length !== 4 && otp.length !== 6) {
+      setErrors({ otp: 'Please enter a valid OTP' });
       return;
     }
     
     setLoading(true);
+    setSignupError('');
+    setErrors({});
     
-    // Simulate OTP verification and account creation
-    setTimeout(() => {
-      const userData = {
-        name: formData.name,
-        email: formData.email,
-      };
-      login(userData);
-      navigate('/');
+    try {
+      const result = await verifyOTP(formData.email, otp);
+      if (result.success) {
+        navigate('/');
+      } else {
+        setErrors({ otp: result.error || 'Invalid OTP. Please try again.' });
+      }
+    } catch (err) {
+      setErrors({ otp: 'An error occurred. Please try again.' });
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   const handleResendOTP = () => {
@@ -204,6 +231,12 @@ const Signup = () => {
               )}
             </div>
 
+            {signupError && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                {typeof signupError === 'string' ? signupError : 'Signup failed. Please check your information.'}
+              </div>
+            )}
+
             <button
               type="submit"
               disabled={loading}
@@ -228,7 +261,7 @@ const Signup = () => {
                   type="text"
                   value={otp}
                   onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  placeholder="Enter 6-digit OTP"
+                  placeholder="Enter OTP"
                   required
                   maxLength={6}
                   className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all text-center text-2xl tracking-widest ${
@@ -246,10 +279,10 @@ const Signup = () => {
 
             <button
               type="submit"
-              disabled={loading || otp.length !== 6}
+              disabled={loading || (otp.length !== 4 && otp.length !== 6)}
               className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Creating Account...' : 'Verify OTP & Sign Up'}
+              {loading ? 'Verifying OTP...' : 'Verify OTP & Sign Up'}
             </button>
 
             <button

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { FaEnvelope, FaPhone, FaLock, FaArrowRight, FaCheckCircle } from 'react-icons/fa';
 import { Link, useNavigate } from 'react-router-dom';
+import { adminForgotPassword, adminResetPassword } from '../services/api';
 
 const ForgotPassword = () => {
   const [method, setMethod] = useState('email'); // 'email' or 'phone'
@@ -20,33 +21,42 @@ const ForgotPassword = () => {
   const handleSendOTP = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setErrors({});
     
-    // Simulate OTP sending
-    setTimeout(() => {
-      setOtpSent(true);
+    try {
+      const result = await adminForgotPassword(email);
+      if (result.success) {
+        setOtpSent(true);
+        // OTP is returned in response.otp for development/testing
+        if (result.otp) {
+          console.log('OTP for testing:', result.otp);
+        }
+      } else {
+        setErrors({ email: result.error || 'Failed to send OTP. Please try again.' });
+      }
+    } catch (err) {
+      setErrors({ email: 'An error occurred. Please try again.' });
+    } finally {
       setLoading(false);
-      // In real app, you would send OTP to email/phone here
-    }, 1000);
+    }
   };
 
   const handleVerifyOTP = async (e) => {
     e.preventDefault();
     
-    if (otp.length !== 6) {
-      setErrors({ otp: 'Please enter a valid 6-digit OTP' });
+    if (otp.length !== 4 && otp.length !== 6) {
+      setErrors({ otp: 'Please enter a valid OTP' });
       return;
     }
     
     setLoading(true);
     setErrors({});
     
-    // Simulate OTP verification
-    setTimeout(() => {
-      // In real app, verify OTP with backend
-      setOtpVerified(true);
-      setOtpSent(false);
-      setLoading(false);
-    }, 1000);
+    // For now, we'll verify OTP when resetting password
+    // In a real implementation, you might have a separate verify endpoint
+    setOtpVerified(true);
+    setOtpSent(false);
+    setLoading(false);
   };
 
   const handleResetPassword = async (e) => {
@@ -55,11 +65,14 @@ const ForgotPassword = () => {
     const newErrors = {};
     if (!newPassword) {
       newErrors.newPassword = 'Password is required';
-    } else if (newPassword.length < 6) {
-      newErrors.newPassword = 'Password must be at least 6 characters';
+    } else if (newPassword.length < 8) {
+      newErrors.newPassword = 'Password must be at least 8 characters';
     }
     if (newPassword !== confirmPassword) {
       newErrors.confirmPassword = 'Passwords do not match';
+    }
+    if (!otp || (otp.length !== 4 && otp.length !== 6)) {
+      newErrors.otp = 'Please enter a valid OTP';
     }
     
     if (Object.keys(newErrors).length > 0) {
@@ -68,16 +81,23 @@ const ForgotPassword = () => {
     }
     
     setLoading(true);
+    setErrors({});
     
-    // Simulate password reset
-    setTimeout(() => {
-      setPasswordReset(true);
+    try {
+      const result = await adminResetPassword(email, otp, newPassword, confirmPassword);
+      if (result.success) {
+        setPasswordReset(true);
+        setTimeout(() => {
+          navigate('/login');
+        }, 2000);
+      } else {
+        setErrors({ general: result.error || 'Password reset failed. Please try again.' });
+      }
+    } catch (err) {
+      setErrors({ general: 'An error occurred. Please try again.' });
+    } finally {
       setLoading(false);
-      // In real app, reset password with backend
-      setTimeout(() => {
-        navigate('/login');
-      }, 2000);
-    }, 1000);
+    }
   };
 
   const handleResendOTP = () => {
@@ -219,7 +239,7 @@ const ForgotPassword = () => {
                   type="text"
                   value={otp}
                   onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  placeholder="Enter 6-digit OTP"
+                  placeholder="Enter OTP"
                   required
                   maxLength={6}
                   className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all text-center text-2xl tracking-widest ${
@@ -237,7 +257,7 @@ const ForgotPassword = () => {
 
             <button
               type="submit"
-              disabled={loading || otp.length !== 6}
+              disabled={loading || (otp.length !== 4 && otp.length !== 6)}
               className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Verifying...' : 'Verify OTP'}
@@ -254,6 +274,11 @@ const ForgotPassword = () => {
         ) : (
           /* Step 3: Reset Password */
           <form onSubmit={handleResetPassword} className="space-y-6">
+            {errors.general && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                {errors.general}
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 New Password

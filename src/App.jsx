@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { ToastProvider } from './components/Toast';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import PublicRoute from './components/PublicRoute';
@@ -13,11 +14,13 @@ import TransactionManagement from './pages/TransactionManagement';
 import DisputeManagement from './pages/DisputeManagement';
 import NotificationManagement from './pages/NotificationManagement';
 import AffiliateManagement from './pages/AffiliateManagement';
+import HeroSectionManagement from './pages/HeroSectionManagement';
 
 function App() {
   return (
     <AuthProvider>
-      <Router>
+      <ToastProvider>
+        <Router>
         <Routes>
           {/* Public Routes */}
           <Route
@@ -61,9 +64,11 @@ function App() {
             <Route path="disputes" element={<DisputeManagement />} />
             <Route path="notifications" element={<NotificationManagement />} />
             <Route path="affiliates" element={<AffiliateManagement />} />
+            <Route path="hero-section" element={<HeroSectionManagement />} />
           </Route>
         </Routes>
-      </Router>
+        </Router>
+      </ToastProvider>
     </AuthProvider>
   );
 }
