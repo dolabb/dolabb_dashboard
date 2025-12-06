@@ -268,7 +268,7 @@ const Dashboard = () => {
         },
         {
           title: 'Total Revenue',
-          value: `$${(dashboardData.stats.totalRevenue || 0).toLocaleString()}`,
+          value: `SAR ${(dashboardData.stats.totalRevenue || 0).toLocaleString()}`,
           icon: FaMoneyBillWave,
           color: 'text-green-600',
         },

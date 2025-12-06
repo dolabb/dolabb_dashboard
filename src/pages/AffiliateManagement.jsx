@@ -227,7 +227,7 @@ const AffiliateManagement = () => {
 
       if (response?.success) {
         console.log(`✅ ${payoutAction === 'approve' ? 'approveAffiliatePayout' : 'rejectAffiliatePayout'} - Success`);
-        alert(`Payout of $${(selectedPayout.amount || 0).toLocaleString()} ${payoutAction === 'approve' ? 'approved' : 'rejected'} successfully!`);
+        alert(`Payout of SAR ${(selectedPayout.amount || 0).toLocaleString()} ${payoutAction === 'approve' ? 'approved' : 'rejected'} successfully!`);
         setShowPayoutModal(false);
         setSelectedPayout(null);
         setPayoutAction('');
@@ -436,18 +436,18 @@ const AffiliateManagement = () => {
                       {affiliate.stats?.totalReferrals || affiliate.totalReferrals || affiliate.referrals || 0}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                      ${((affiliate.stats?.totalEarnings || affiliate.totalEarnings || affiliate.sales || 0)).toLocaleString()}
+                      SAR {((affiliate.stats?.totalEarnings || affiliate.totalEarnings || affiliate.sales || 0)).toLocaleString()}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
                       <div className="text-sm">
                         <div className="font-medium text-gray-900">
-                          Total: ${((affiliate.Earnings?.Total || affiliate.stats?.totalEarnings || affiliate.totalEarnings || affiliate.earnings || 0)).toLocaleString()}
+                          Total: SAR {((affiliate.Earnings?.Total || affiliate.stats?.totalEarnings || affiliate.totalEarnings || affiliate.earnings || 0)).toLocaleString()}
                         </div>
                         <div className="text-yellow-600">
-                          Pending: ${((affiliate.Earnings?.Pending || affiliate.pendingEarnings || affiliate.pending || 0)).toLocaleString()}
+                          Pending: SAR {((affiliate.Earnings?.Pending || affiliate.pendingEarnings || affiliate.pending || 0)).toLocaleString()}
                         </div>
                         <div className="text-green-600">
-                          Paid: ${((affiliate.Earnings?.Paid || affiliate.paidEarnings || affiliate.paid || 0)).toLocaleString()}
+                          Paid: SAR {((affiliate.Earnings?.Paid || affiliate.paidEarnings || affiliate.paid || 0)).toLocaleString()}
                         </div>
                       </div>
                     </td>
@@ -582,7 +582,7 @@ const AffiliateManagement = () => {
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
                       <div className="text-sm font-semibold text-gray-900">
-                        ${(payout.amount || 0).toLocaleString()}
+                        SAR {(payout.amount || 0).toLocaleString()}
                       </div>
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -722,7 +722,7 @@ const AffiliateManagement = () => {
                   <div>
                     <span className="text-gray-600">Total Earnings:</span>
                     <span className="font-semibold ml-2">
-                      ${((selectedAffiliate.Earnings?.Total || selectedAffiliate.stats?.totalEarnings || selectedAffiliate.totalEarnings || selectedAffiliate.earnings || 0)).toLocaleString()}
+                      SAR {((selectedAffiliate.Earnings?.Total || selectedAffiliate.stats?.totalEarnings || selectedAffiliate.totalEarnings || selectedAffiliate.earnings || 0)).toLocaleString()}
                     </span>
                   </div>
                 </div>
@@ -765,10 +765,10 @@ const AffiliateManagement = () => {
                             {transaction['Referred User Name'] || transaction.ReferredUserName || transaction.referredUser || transaction.userName || 'N/A'}
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                            ${((transaction.stats?.['Total Sales'] || transaction.stats?.totalSales || transaction.amount || transaction.saleAmount || 0)).toLocaleString()}
+                            SAR {((transaction.stats?.['Total Sales'] || transaction.stats?.totalSales || transaction.amount || transaction.saleAmount || 0)).toLocaleString()}
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
-                            ${((transaction['Referred User Commission'] || transaction.ReferredUserCommission || transaction.commission || 0)).toLocaleString()}
+                            SAR {((transaction['Referred User Commission'] || transaction.ReferredUserCommission || transaction.commission || 0)).toLocaleString()}
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap">
                             {getStatusBadge(transaction.status)}

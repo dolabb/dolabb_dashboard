@@ -350,6 +350,17 @@ export const hideListing = async listingId => {
 };
 
 /**
+ * Update Listing
+ * PUT /api/admin/listings/{listing_id}/update/
+ */
+export const updateListing = async (listingId, listingData) => {
+  return apiRequest(`/api/admin/listings/${listingId}/update/`, {
+    method: 'PUT',
+    body: JSON.stringify(listingData),
+  });
+};
+
+/**
  * Get Listing Details
  * GET /api/admin/listings/{listing_id}/
  */

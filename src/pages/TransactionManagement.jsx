@@ -270,10 +270,10 @@ const TransactionManagement = () => {
                         <td className="px-4 sm:px-6 py-4 text-sm text-gray-700 whitespace-nowrap">{transaction.SellerName || 'N/A'}</td>
                         <td className="px-4 sm:px-6 py-4 text-sm text-gray-700 whitespace-nowrap">{transaction.itemTitle || 'N/A'}</td>
                         <td className="px-4 sm:px-6 py-4 font-semibold text-gray-900 whitespace-nowrap">
-                          ${(transaction.offerAmount || transaction.originalPrice || 0).toLocaleString()}
+                          SAR {(transaction.offerAmount || transaction.originalPrice || 0).toLocaleString()}
                         </td>
                         <td className="px-4 sm:px-6 py-4 text-green-600 font-semibold whitespace-nowrap">
-                          ${(transaction.dolabbFee || 0).toLocaleString()}
+                          SAR {(transaction.dolabbFee || 0).toLocaleString()}
                         </td>
                         <td className="px-4 sm:px-6 py-4">{getStatusBadge(transaction.status)}</td>
                         <td className="px-4 sm:px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
@@ -358,7 +358,7 @@ const TransactionManagement = () => {
                   >
                         <td className="px-4 sm:px-6 py-4 font-semibold text-gray-900 whitespace-nowrap">{request.SellerName || 'N/A'}</td>
                         <td className="px-4 sm:px-6 py-4 font-semibold text-green-600 whitespace-nowrap">
-                          ${(request.amount || 0).toLocaleString()}
+                          SAR {(request.amount || 0).toLocaleString()}
                         </td>
                         <td className="px-4 sm:px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
                           {request.accountDetails ? `${request.accountDetails.bankName || ''} - ${request.accountDetails.accountNumber || ''}` : 'N/A'}
@@ -437,7 +437,7 @@ const TransactionManagement = () => {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2 whitespace-nowrap">
-                  Minimum Fee ($)
+                  Minimum Fee (SAR)
                 </label>
                 <input
                   type="number"
@@ -464,7 +464,7 @@ const TransactionManagement = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2 whitespace-nowrap">
-                  Maximum Fee ($)
+                  Maximum Fee (SAR)
                 </label>
                 <input
                   type="number"
@@ -477,7 +477,7 @@ const TransactionManagement = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2 whitespace-nowrap">
-                  Transaction Fee Fixed ($)
+                  Transaction Fee Fixed (SAR)
                 </label>
                 <input
                   type="number"
@@ -518,7 +518,7 @@ const TransactionManagement = () => {
               <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                 <p className="text-sm text-gray-600 whitespace-nowrap">Total Fees Collected</p>
                 <p className="text-xl sm:text-2xl font-bold text-green-600 mt-2 whitespace-nowrap">
-                  ${(feeSummary?.['Total Fees Collected'] || 0).toLocaleString()}
+                  SAR {(feeSummary?.['Total Fees Collected'] || 0).toLocaleString()}
                 </p>
               </div>
               <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
@@ -530,7 +530,7 @@ const TransactionManagement = () => {
               <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                 <p className="text-sm text-gray-600 whitespace-nowrap">Average Fee per Transaction</p>
                 <p className="text-xl sm:text-2xl font-bold text-yellow-600 mt-2 whitespace-nowrap">
-                  ${(feeSummary?.['Average Fee per Transaction'] || 0).toLocaleString()}
+                  SAR {(feeSummary?.['Average Fee per Transaction'] || 0).toLocaleString()}
                 </p>
               </div>
             </div>

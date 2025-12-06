@@ -233,7 +233,7 @@ const UserManagement = () => {
                       <td className="px-4 sm:px-6 py-4 text-sm text-gray-700">
                         {user.Activity ? (
                           <span className="whitespace-nowrap">
-                            Purchases: {user.Activity.totalPurchases || 0} | Spent: ${(user.Activity.totalSpent || 0).toLocaleString()}
+                            Purchases: {user.Activity.totalPurchases || 0} | Spent: SAR {(user.Activity.totalSpent || 0).toLocaleString()}
                           </span>
                         ) : (
                           <span className="text-gray-400">No activity</span>
@@ -408,7 +408,7 @@ const UserManagement = () => {
                   {selectedUser.accountHistory?.length > 0 ? (
                     selectedUser.accountHistory.map((history, idx) => (
                       <div key={idx} className="bg-gray-50 p-3 rounded border border-gray-200">
-                        <p className="text-sm text-gray-700 whitespace-nowrap"><strong className="text-gray-900">{history.date}</strong> - {history.action}: {history.item} (${history.amount?.toLocaleString()})</p>
+                        <p className="text-sm text-gray-700 whitespace-nowrap"><strong className="text-gray-900">{history.date}</strong> - {history.action}: {history.item} (SAR {history.amount?.toLocaleString()})</p>
                       </div>
                     ))
                   ) : (

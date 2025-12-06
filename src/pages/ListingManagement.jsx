@@ -5,6 +5,8 @@ import {
   approveListing,
   rejectListing,
   hideListing,
+  updateListing,
+  getListingDetails,
 } from '../services/api';
 
 const ListingManagement = () => {
@@ -15,6 +17,16 @@ const ListingManagement = () => {
   const [pagination, setPagination] = useState({ currentPage: 1, totalPages: 1, totalItems: 0 });
   const [currentPage, setCurrentPage] = useState(1);
   const [actionLoading, setActionLoading] = useState(null);
+  const [editingListing, setEditingListing] = useState(null);
+  const [editFormData, setEditFormData] = useState({
+    title: '',
+    price: '',
+    currency: 'SAR',
+    status: 'active',
+    approved: false,
+    reviewed: false,
+  });
+  const [editLoading, setEditLoading] = useState(false);
 
   useEffect(() => {
     fetchListings();
@@ -67,6 +79,49 @@ const ListingManagement = () => {
       alert(`An error occurred while ${action}ing listing`);
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const handleEditClick = async (listing) => {
+    try {
+      const response = await getListingDetails(listing._id || listing.id);
+      if (response.success) {
+        const listingData = response.listing || response;
+        setEditFormData({
+          title: listingData.title || '',
+          price: listingData.price || '',
+          currency: listingData.currency || 'SAR',
+          status: listingData.status || 'active',
+          approved: listingData.approved || false,
+          reviewed: listingData.reviewed || false,
+        });
+        setEditingListing(listing._id || listing.id);
+      } else {
+        alert('Failed to load listing details');
+      }
+    } catch (err) {
+      alert('An error occurred while loading listing details');
+    }
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    if (!editingListing) return;
+
+    setEditLoading(true);
+    try {
+      const response = await updateListing(editingListing, editFormData);
+      if (response.success) {
+        alert('Listing updated successfully');
+        setEditingListing(null);
+        fetchListings();
+      } else {
+        alert(response.error || 'Failed to update listing');
+      }
+    } catch (err) {
+      alert('An error occurred while updating listing');
+    } finally {
+      setEditLoading(false);
     }
   };
 
@@ -225,7 +280,7 @@ const ListingManagement = () => {
                         </span>
                       </td>
                       <td className='px-4 sm:px-6 py-4 font-semibold text-green-600 whitespace-nowrap'>
-                        ${(listing.price || 0).toLocaleString()}
+                        {listing.currency || 'SAR'} {(listing.price || 0).toLocaleString()}
                       </td>
                       <td className='px-4 sm:px-6 py-4'>
                         {getStatusBadge(listing.status)}
@@ -250,6 +305,13 @@ const ListingManagement = () => {
                       </td>
                       <td className='px-4 sm:px-6 py-4'>
                         <div className='flex gap-2 flex-wrap'>
+                          <button
+                            onClick={() => handleEditClick(listing)}
+                            className='px-2 sm:px-3 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 whitespace-nowrap'
+                            title="Edit Listing"
+                          >
+                            Edit
+                          </button>
                           {listing.reviewed && !listing.approved && (
                             <button
                               onClick={() => handleAction(listing._id || listing.id, 'approve')}
@@ -312,6 +374,132 @@ const ListingManagement = () => {
           </>
         )}
       </div>
+
+      {/* Edit Listing Modal */}
+      {editingListing && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+          >
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-gray-900">Edit Listing</h2>
+                <button
+                  onClick={() => setEditingListing(null)}
+                  className="text-gray-400 hover:text-gray-600 text-2xl"
+                >
+                  ×
+                </button>
+              </div>
+
+              <form onSubmit={handleEditSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Title
+                  </label>
+                  <input
+                    type="text"
+                    value={editFormData.title}
+                    onChange={(e) => setEditFormData({ ...editFormData, title: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Price
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={editFormData.price}
+                      onChange={(e) => setEditFormData({ ...editFormData, price: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Currency
+                    </label>
+                    <select
+                      value={editFormData.currency}
+                      onChange={(e) => setEditFormData({ ...editFormData, currency: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    >
+                      <option value="SAR">SAR (Saudi Riyal)</option>
+                      <option value="USD">USD (US Dollar)</option>
+                      <option value="EUR">EUR (Euro)</option>
+                      <option value="GBP">GBP (British Pound)</option>
+                      <option value="AED">AED (UAE Dirham)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Status
+                  </label>
+                  <select
+                    value={editFormData.status}
+                    onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  >
+                    <option value="active">Active</option>
+                    <option value="sold">Sold</option>
+                    <option value="removed">Removed</option>
+                  </select>
+                </div>
+
+                <div className="flex gap-4">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={editFormData.approved}
+                      onChange={(e) => setEditFormData({ ...editFormData, approved: e.target.checked })}
+                      className="mr-2"
+                    />
+                    <span className="text-sm text-gray-700">Approved</span>
+                  </label>
+
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={editFormData.reviewed}
+                      onChange={(e) => setEditFormData({ ...editFormData, reviewed: e.target.checked })}
+                      className="mr-2"
+                    />
+                    <span className="text-sm text-gray-700">Reviewed</span>
+                  </label>
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="submit"
+                    disabled={editLoading}
+                    className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                  >
+                    {editLoading ? 'Updating...' : 'Update Listing'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingListing(null)}
+                    className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 };
