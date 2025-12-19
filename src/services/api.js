@@ -4,7 +4,8 @@
  */
 
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || 'https://dolabb-backend-2vsj.onrender.com';
+  import.meta.env.VITE_API_BASE_URL ||
+  'https://dolabb-backend-2vsj.onrender.com';
 
 /**
  * Helper function to get auth token from localStorage
@@ -36,6 +37,18 @@ const apiRequest = async (endpoint, options = {}) => {
 
   try {
     const response = await fetch(url, config);
+
+    // Check if response is JSON
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      const text = await response.text();
+      throw new Error(
+        `Server returned ${response.status}: ${
+          response.statusText
+        }. ${text.substring(0, 100)}`
+      );
+    }
+
     const data = await response.json();
 
     if (!response.ok) {
@@ -213,7 +226,9 @@ export const getCashoutRequestsSummary = async () => {
 export const getRecentActivities = async (limit = 10, type = null) => {
   const params = new URLSearchParams({ limit: limit.toString() });
   if (type) params.append('type', type);
-  return apiRequest(`/api/admin/dashboard/recent-activities/?${params.toString()}`);
+  return apiRequest(
+    `/api/admin/dashboard/recent-activities/?${params.toString()}`
+  );
 };
 
 // ==================== User Management APIs ====================
@@ -603,7 +618,11 @@ export const getDisputeDetails = async disputeId => {
  * Add Dispute Message/Note
  * POST /api/admin/disputes/{dispute_id}/messages/
  */
-export const addDisputeMessage = async (disputeId, message, type = 'admin_note') => {
+export const addDisputeMessage = async (
+  disputeId,
+  message,
+  type = 'admin_note'
+) => {
   return apiRequest(`/api/admin/disputes/${disputeId}/messages/`, {
     method: 'POST',
     body: JSON.stringify({ message, type }),
@@ -614,7 +633,11 @@ export const addDisputeMessage = async (disputeId, message, type = 'admin_note')
  * Upload Dispute Evidence
  * POST /api/admin/disputes/{dispute_id}/evidence/
  */
-export const uploadDisputeEvidence = async (disputeId, file, description = null) => {
+export const uploadDisputeEvidence = async (
+  disputeId,
+  file,
+  description = null
+) => {
   const formData = new FormData();
   formData.append('file', file);
   if (description) formData.append('description', description);
@@ -685,19 +708,28 @@ export const getAllAffiliates = async (page = 1, limit = 20) => {
  * Get Affiliate Transactions (from /api/affiliate/{affiliate_id}/transactions/)
  * GET /api/affiliate/{affiliate_id}/transactions/
  */
-export const getAffiliateTransactions = async (affiliateId, page = 1, limit = 20) => {
+export const getAffiliateTransactions = async (
+  affiliateId,
+  page = 1,
+  limit = 20
+) => {
   const params = new URLSearchParams({
     page: page.toString(),
     limit: limit.toString(),
   });
-  return apiRequest(`/api/affiliate/${affiliateId}/transactions/?${params.toString()}`);
+  return apiRequest(
+    `/api/affiliate/${affiliateId}/transactions/?${params.toString()}`
+  );
 };
 
 /**
  * Update Affiliate Commission (from /api/affiliate/{affiliate_id}/update-commission/)
  * PUT /api/affiliate/{affiliate_id}/update-commission/
  */
-export const updateAffiliateCommission = async (affiliateId, commissionRate) => {
+export const updateAffiliateCommission = async (
+  affiliateId,
+  commissionRate
+) => {
   return apiRequest(`/api/affiliate/${affiliateId}/update-commission/`, {
     method: 'PUT',
     body: JSON.stringify({ commissionRate }),
@@ -718,7 +750,11 @@ export const suspendAffiliate = async affiliateId => {
  * Get Affiliate Payout Requests (from /api/affiliate/payout-requests/)
  * GET /api/affiliate/payout-requests/
  */
-export const getAffiliatePayoutRequests = async (page = 1, limit = 20, status = null) => {
+export const getAffiliatePayoutRequests = async (
+  page = 1,
+  limit = 20,
+  status = null
+) => {
   const params = new URLSearchParams({
     page: page.toString(),
     limit: limit.toString(),
@@ -787,7 +823,12 @@ export const createNotification = async notificationData => {
  * Get Notifications List (from /api/notifications/admin/list/)
  * GET /api/notifications/admin/list/
  */
-export const getNotifications = async (page = 1, limit = 20, type = null, targetAudience = null) => {
+export const getNotifications = async (
+  page = 1,
+  limit = 20,
+  type = null,
+  targetAudience = null
+) => {
   const params = new URLSearchParams({
     page: page.toString(),
     limit: limit.toString(),
@@ -854,7 +895,11 @@ export const updateAdminProfile = async profileData => {
  * Change Admin Password
  * PUT /api/admin/profile/change-password/
  */
-export const changeAdminPassword = async (currentPassword, newPassword, confirmPassword) => {
+export const changeAdminPassword = async (
+  currentPassword,
+  newPassword,
+  confirmPassword
+) => {
   return apiRequest('/api/admin/profile/change-password/', {
     method: 'PUT',
     body: JSON.stringify({
@@ -869,7 +914,13 @@ export const changeAdminPassword = async (currentPassword, newPassword, confirmP
  * Get Activity Logs
  * GET /api/admin/activity-logs/
  */
-export const getActivityLogs = async (page = 1, limit = 20, action = null, fromDate = null, toDate = null) => {
+export const getActivityLogs = async (
+  page = 1,
+  limit = 20,
+  action = null,
+  fromDate = null,
+  toDate = null
+) => {
   const params = new URLSearchParams({
     page: page.toString(),
     limit: limit.toString(),
@@ -886,7 +937,12 @@ export const getActivityLogs = async (page = 1, limit = 20, action = null, fromD
  * Generate Report
  * POST /api/admin/reports/generate/
  */
-export const generateReport = async (reportType, fromDate, toDate, format = 'pdf') => {
+export const generateReport = async (
+  reportType,
+  fromDate,
+  toDate,
+  format = 'pdf'
+) => {
   return apiRequest('/api/admin/reports/generate/', {
     method: 'POST',
     body: JSON.stringify({
@@ -920,19 +976,19 @@ export const getHeroSection = async () => {
  * Update Hero Section
  * PUT /api/admin/hero-section/update/
  */
-export const updateHeroSection = async (heroData) => {
+export const updateHeroSection = async heroData => {
   const formData = new FormData();
-  
+
   // Validate and append backgroundType (required field)
   const validBackgroundTypes = ['image', 'single_color', 'gradient'];
   let backgroundType = heroData.backgroundType;
-  
+
   // Ensure it's a string and trim whitespace
   if (typeof backgroundType !== 'string') {
     backgroundType = String(backgroundType || 'image');
   }
   backgroundType = backgroundType.trim();
-  
+
   // Ensure it's exactly one of the valid types (case-sensitive exact match)
   if (!validBackgroundTypes.includes(backgroundType)) {
     // Log for debugging
@@ -941,35 +997,50 @@ export const updateHeroSection = async (heroData) => {
       type: typeof backgroundType,
       length: backgroundType.length,
       charCodes: backgroundType.split('').map(c => c.charCodeAt(0)),
-      validTypes: validBackgroundTypes
+      validTypes: validBackgroundTypes,
     });
-    throw new Error(`Invalid background type: "${backgroundType}". Must be one of: ${validBackgroundTypes.join(', ')}`);
+    throw new Error(
+      `Invalid background type: "${backgroundType}". Must be one of: ${validBackgroundTypes.join(
+        ', '
+      )}`
+    );
   }
-  
+
   // Append the exact string value (ensure no extra characters)
   formData.append('backgroundType', backgroundType);
-  
+
   // Log what we're sending (for debugging)
-  console.log('Sending backgroundType to API:', backgroundType, 'Type:', typeof backgroundType);
-  
+  console.log(
+    'Sending backgroundType to API:',
+    backgroundType,
+    'Type:',
+    typeof backgroundType
+  );
+
   // Append file if provided
   if (heroData.image) {
     formData.append('image', heroData.image);
   }
-  
+
   // Append other fields
   if (heroData.imageUrl) formData.append('imageUrl', heroData.imageUrl);
-  if (heroData.singleColor) formData.append('singleColor', heroData.singleColor);
+  if (heroData.singleColor)
+    formData.append('singleColor', heroData.singleColor);
   if (heroData.gradientColors && Array.isArray(heroData.gradientColors)) {
     formData.append('gradientColors', JSON.stringify(heroData.gradientColors));
   }
-  if (heroData.gradientDirection) formData.append('gradientDirection', heroData.gradientDirection);
+  if (heroData.gradientDirection)
+    formData.append('gradientDirection', heroData.gradientDirection);
   if (heroData.title !== undefined) formData.append('title', heroData.title);
-  if (heroData.subtitle !== undefined) formData.append('subtitle', heroData.subtitle);
-  if (heroData.buttonText !== undefined) formData.append('buttonText', heroData.buttonText);
-  if (heroData.buttonLink !== undefined) formData.append('buttonLink', heroData.buttonLink);
+  if (heroData.subtitle !== undefined)
+    formData.append('subtitle', heroData.subtitle);
+  if (heroData.buttonText !== undefined)
+    formData.append('buttonText', heroData.buttonText);
+  if (heroData.buttonLink !== undefined)
+    formData.append('buttonLink', heroData.buttonLink);
   if (heroData.textColor) formData.append('textColor', heroData.textColor);
-  if (heroData.isActive !== undefined) formData.append('isActive', heroData.isActive.toString());
+  if (heroData.isActive !== undefined)
+    formData.append('isActive', heroData.isActive.toString());
 
   const token = getAuthToken();
   const url = `${API_BASE_URL}/api/admin/hero-section/update/`;

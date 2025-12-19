@@ -302,20 +302,28 @@ const DisputeManagement = () => {
               </div>
 
               <div>
-                <p className="text-sm text-gray-600 whitespace-nowrap">Buyer</p>
-                <p className="font-semibold text-gray-900 whitespace-nowrap">{selectedDispute.buyer}</p>
+                <p className="text-sm text-gray-600 whitespace-nowrap">Buyer Name</p>
+                <p className="font-semibold text-gray-900 whitespace-nowrap">{selectedDispute.buyerName || selectedDispute.buyer || 'N/A'}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-600 whitespace-nowrap">Seller</p>
-                <p className="font-semibold text-gray-900 whitespace-nowrap">{selectedDispute.seller}</p>
+                <p className="text-sm text-gray-600 whitespace-nowrap">Seller Name</p>
+                <p className="font-semibold text-gray-900 whitespace-nowrap">{selectedDispute.SellerName || selectedDispute.seller || 'N/A'}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-600 whitespace-nowrap">Item</p>
-                <p className="font-semibold text-gray-900 whitespace-nowrap">{selectedDispute.item}</p>
+                <p className="text-sm text-gray-600 whitespace-nowrap">Order ID</p>
+                <p className="font-semibold text-gray-900 whitespace-nowrap">{selectedDispute.orderId || selectedDispute.order_id || selectedDispute.orderID || selectedDispute.order || 'N/A'}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-600 mb-2 whitespace-nowrap">Description</p>
-                <p className="bg-gray-50 p-3 rounded text-gray-700 border border-gray-200">{selectedDispute.description}</p>
+                <p className="text-sm text-gray-600 whitespace-nowrap">Item Title</p>
+                <p className="font-semibold text-gray-900 whitespace-nowrap">{selectedDispute.itemTitle || selectedDispute.item || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 mb-2 whitespace-nowrap">Item Description</p>
+                <p className="bg-gray-50 p-3 rounded text-gray-700 border border-gray-200">{selectedDispute.itemDescription || selectedDispute.item_description || selectedDispute.itemDesc || selectedDispute.description || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 mb-2 whitespace-nowrap">Dispute Description</p>
+                <p className="bg-gray-50 p-3 rounded text-gray-700 border border-gray-200">{selectedDispute.description || 'N/A'}</p>
               </div>
 
               <div>

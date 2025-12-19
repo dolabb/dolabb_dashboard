@@ -40,6 +40,9 @@ const AffiliateManagement = () => {
   const [payoutPagination, setPayoutPagination] = useState({ currentPage: 1, totalPages: 1, totalItems: 0 });
   const [affiliatePage, setAffiliatePage] = useState(1);
   const [payoutPage, setPayoutPage] = useState(1);
+  const [currencyFilter, setCurrencyFilter] = useState('all');
+  const [transactionCurrencyFilter, setTransactionCurrencyFilter] = useState('all');
+  const [payoutCurrencyFilter, setPayoutCurrencyFilter] = useState('all');
 
   useEffect(() => {
     if (activeTab === 'affiliates') {
@@ -227,7 +230,7 @@ const AffiliateManagement = () => {
 
       if (response?.success) {
         console.log(`✅ ${payoutAction === 'approve' ? 'approveAffiliatePayout' : 'rejectAffiliatePayout'} - Success`);
-        alert(`Payout of SAR ${(selectedPayout.amount || 0).toLocaleString()} ${payoutAction === 'approve' ? 'approved' : 'rejected'} successfully!`);
+        alert(`Payout of ${(selectedPayout.currency || 'SAR')} ${(selectedPayout.amount || 0).toLocaleString()} ${payoutAction === 'approve' ? 'approved' : 'rejected'} successfully!`);
         setShowPayoutModal(false);
         setSelectedPayout(null);
         setPayoutAction('');
@@ -330,9 +333,73 @@ const AffiliateManagement = () => {
           ) : (
             <>
               <div className="p-4 border-b border-gray-200">
-                <h2 className="text-lg sm:text-xl font-semibold text-gray-900 whitespace-nowrap">
-                  All Affiliates & Activity
-                </h2>
+                <div className="flex justify-between items-center flex-wrap gap-4 mb-4">
+                  <h2 className="text-lg sm:text-xl font-semibold text-gray-900 whitespace-nowrap">
+                    All Affiliates & Activity
+                  </h2>
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Filter by Currency:</label>
+                    <select
+                      value={currencyFilter}
+                      onChange={(e) => setCurrencyFilter(e.target.value)}
+                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
+                    >
+                      <option value="all">All Currencies</option>
+                      <option value="SAR">SAR</option>
+                      <option value="USD">USD</option>
+                      <option value="EUR">EUR</option>
+                      <option value="GBP">GBP</option>
+                      <option value="AED">AED</option>
+                      <option value="USDT">USDT</option>
+                    </select>
+                  </div>
+                </div>
+                {/* Currency Totals Summary */}
+                {(() => {
+                  const currencyTotals = {};
+                  affiliatesList.forEach(affiliate => {
+                    const earningsByCurrency = affiliate.EarningsByCurrency || {};
+                    Object.keys(earningsByCurrency).forEach(currency => {
+                      if (!currencyTotals[currency]) {
+                        currencyTotals[currency] = { total: 0, pending: 0, paid: 0 };
+                      }
+                      currencyTotals[currency].total += earningsByCurrency[currency].total || 0;
+                      currencyTotals[currency].pending += earningsByCurrency[currency].pending || 0;
+                      currencyTotals[currency].paid += earningsByCurrency[currency].paid || 0;
+                    });
+                  });
+                  
+                  const currencies = Object.keys(currencyTotals);
+                  if (currencies.length > 0) {
+                    return (
+                      <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                        <h3 className="text-sm font-semibold text-gray-700 mb-3">Totals by Currency</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {currencies.map(currency => {
+                            const totals = currencyTotals[currency];
+                            return (
+                              <div key={currency} className="bg-white p-3 rounded border border-gray-200">
+                                <div className="font-semibold text-gray-900 mb-2">{currency}</div>
+                                <div className="text-sm space-y-1">
+                                  <div className="text-gray-700">
+                                    Total: <span className="font-semibold">{currency} {totals.total.toLocaleString()}</span>
+                                  </div>
+                                  <div className="text-yellow-600">
+                                    Pending: <span className="font-semibold">{currency} {totals.pending.toLocaleString()}</span>
+                                  </div>
+                                  <div className="text-green-600">
+                                    Paid: <span className="font-semibold">{currency} {totals.paid.toLocaleString()}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
               <div className="overflow-x-auto">
             <table className="w-full min-w-[1000px]">
@@ -350,11 +417,14 @@ const AffiliateManagement = () => {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">
                     Referrals
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">
                     Total Sales
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">
                     Earnings
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">
+                    Currency
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">
                     Last Activity
@@ -365,7 +435,13 @@ const AffiliateManagement = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {affiliatesList.map((affiliate, index) => (
+                {affiliatesList
+                  .filter(affiliate => {
+                    if (currencyFilter === 'all') return true;
+                    const earningsByCurrency = affiliate.EarningsByCurrency || {};
+                    return Object.keys(earningsByCurrency).includes(currencyFilter);
+                  })
+                  .map((affiliate, index) => (
                   <motion.tr
                     key={affiliate.id || affiliate._id || `affiliate-${index}`}
                     initial={{ opacity: 0, x: -20 }}
@@ -436,19 +512,71 @@ const AffiliateManagement = () => {
                       {affiliate.stats?.totalReferrals || affiliate.totalReferrals || affiliate.referrals || 0}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                      SAR {((affiliate.stats?.totalEarnings || affiliate.totalEarnings || affiliate.sales || 0)).toLocaleString()}
+                      {(() => {
+                        const earningsByCurrency = affiliate.EarningsByCurrency || {};
+                        const currencies = Object.keys(earningsByCurrency);
+                        if (currencies.length === 0) {
+                          return 'SAR 0';
+                        }
+                        return currencies.map(curr => `${curr} ${(earningsByCurrency[curr]?.total || 0).toLocaleString()}`).join(', ');
+                      })()}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
-                      <div className="text-sm">
-                        <div className="font-medium text-gray-900">
-                          Total: SAR {((affiliate.Earnings?.Total || affiliate.stats?.totalEarnings || affiliate.totalEarnings || affiliate.earnings || 0)).toLocaleString()}
-                        </div>
-                        <div className="text-yellow-600">
-                          Pending: SAR {((affiliate.Earnings?.Pending || affiliate.pendingEarnings || affiliate.pending || 0)).toLocaleString()}
-                        </div>
-                        <div className="text-green-600">
-                          Paid: SAR {((affiliate.Earnings?.Paid || affiliate.paidEarnings || affiliate.paid || 0)).toLocaleString()}
-                        </div>
+                      <div className="text-sm space-y-1">
+                        {(() => {
+                          const earningsByCurrency = affiliate.EarningsByCurrency || {};
+                          const currencies = Object.keys(earningsByCurrency);
+                          
+                          if (currencies.length === 0) {
+                            return (
+                              <>
+                                <div className="font-medium text-gray-900">
+                                  Total: SAR {((affiliate.Earnings?.Total || affiliate.stats?.totalEarnings || affiliate.totalEarnings || affiliate.earnings || 0)).toLocaleString()}
+                                </div>
+                                <div className="text-yellow-600">
+                                  Pending: SAR {((affiliate.Earnings?.Pending || affiliate.pendingEarnings || affiliate.pending || 0)).toLocaleString()}
+                                </div>
+                                <div className="text-green-600">
+                                  Paid: SAR {((affiliate.Earnings?.Paid || affiliate.paidEarnings || affiliate.paid || 0)).toLocaleString()}
+                                </div>
+                              </>
+                            );
+                          }
+                          
+                          return currencies.map(currency => {
+                            const currencyEarnings = earningsByCurrency[currency];
+                            return (
+                              <div key={currency} className="border-l-2 border-gray-200 pl-2">
+                                <div className="font-semibold text-gray-700">{currency}:</div>
+                                <div className="font-medium text-gray-900 ml-2">
+                                  Total: {currency} {(currencyEarnings?.total || 0).toLocaleString()}
+                                </div>
+                                <div className="text-yellow-600 ml-2">
+                                  Pending: {currency} {(currencyEarnings?.pending || 0).toLocaleString()}
+                                </div>
+                                <div className="text-green-600 ml-2">
+                                  Paid: {currency} {(currencyEarnings?.paid || 0).toLocaleString()}
+                                </div>
+                              </div>
+                            );
+                          });
+                        })()}
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <div className="flex flex-wrap gap-1">
+                        {(() => {
+                          const earningsByCurrency = affiliate.EarningsByCurrency || {};
+                          const currencies = Object.keys(earningsByCurrency);
+                          if (currencies.length === 0) {
+                            return <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs">SAR</span>;
+                          }
+                          return currencies.map(curr => (
+                            <span key={curr} className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-semibold">
+                              {curr}
+                            </span>
+                          ));
+                        })()}
                       </div>
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -531,10 +659,26 @@ const AffiliateManagement = () => {
             </div>
           ) : (
             <>
-              <div className="p-4 border-b border-gray-200">
+              <div className="p-4 border-b border-gray-200 flex justify-between items-center flex-wrap gap-4">
                 <h2 className="text-lg sm:text-xl font-semibold text-gray-900 whitespace-nowrap">
                   Payout Requests
                 </h2>
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Filter by Currency:</label>
+                  <select
+                    value={payoutCurrencyFilter}
+                    onChange={(e) => setPayoutCurrencyFilter(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
+                  >
+                    <option value="all">All Currencies</option>
+                    <option value="SAR">SAR</option>
+                    <option value="USD">USD</option>
+                    <option value="EUR">EUR</option>
+                    <option value="GBP">GBP</option>
+                    <option value="AED">AED</option>
+                    <option value="USDT">USDT</option>
+                  </select>
+                </div>
               </div>
               <div className="overflow-x-auto">
             <table className="w-full min-w-[1000px]">
@@ -545,6 +689,9 @@ const AffiliateManagement = () => {
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">
                     Amount
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">
+                    Currency
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">
                     Request Date
@@ -564,7 +711,12 @@ const AffiliateManagement = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {payoutsList.map((payout, index) => (
+                {payoutsList
+                  .filter(payout => {
+                    if (payoutCurrencyFilter === 'all') return true;
+                    return (payout.currency || 'SAR') === payoutCurrencyFilter;
+                  })
+                  .map((payout, index) => (
                   <motion.tr
                     key={payout.id || payout._id || `payout-${index}`}
                     initial={{ opacity: 0, x: -20 }}
@@ -582,8 +734,13 @@ const AffiliateManagement = () => {
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
                       <div className="text-sm font-semibold text-gray-900">
-                        SAR {(payout.amount || 0).toLocaleString()}
+                        {(payout.currency || 'SAR')} {(payout.amount || 0).toLocaleString()}
                       </div>
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-semibold">
+                        {payout.currency || 'SAR'}
+                      </span>
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
                       {payout['Requested Date'] ? new Date(payout['Requested Date']).toLocaleDateString() : (payout.requestedDate ? new Date(payout.requestedDate).toLocaleDateString() : 'N/A')}
@@ -700,6 +857,22 @@ const AffiliateManagement = () => {
                 </button>
               </div>
               <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+                <div className="mb-4 flex items-center gap-2">
+                  <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Filter by Currency:</label>
+                  <select
+                    value={transactionCurrencyFilter}
+                    onChange={(e) => setTransactionCurrencyFilter(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
+                  >
+                    <option value="all">All Currencies</option>
+                    <option value="SAR">SAR</option>
+                    <option value="USD">USD</option>
+                    <option value="EUR">EUR</option>
+                    <option value="GBP">GBP</option>
+                    <option value="AED">AED</option>
+                    <option value="USDT">USDT</option>
+                  </select>
+                </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
                   <div>
                     <span className="text-gray-600">Total Referrals:</span>
@@ -747,13 +920,26 @@ const AffiliateManagement = () => {
                         Commission
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">
+                        Currency
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">
                         Status
                       </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {affiliateTransactions.length > 0 ? (
-                      affiliateTransactions.map((transaction, index) => (
+                    {affiliateTransactions
+                      .filter(transaction => {
+                        if (transactionCurrencyFilter === 'all') return true;
+                        return (transaction.currency || 'SAR') === transactionCurrencyFilter;
+                      })
+                      .length > 0 ? (
+                      affiliateTransactions
+                        .filter(transaction => {
+                          if (transactionCurrencyFilter === 'all') return true;
+                          return (transaction.currency || 'SAR') === transactionCurrencyFilter;
+                        })
+                        .map((transaction, index) => (
                         <tr key={transaction._id || transaction['Transaction ID'] || transaction.id || transaction.transactionId || `transaction-${index}`} className="hover:bg-gray-50">
                           <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                             {transaction['Transaction ID'] || transaction.TransactionID || transaction.transactionId || transaction.id || transaction._id || 'N/A'}
@@ -765,10 +951,15 @@ const AffiliateManagement = () => {
                             {transaction['Referred User Name'] || transaction.ReferredUserName || transaction.referredUser || transaction.userName || 'N/A'}
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                            SAR {((transaction.stats?.['Total Sales'] || transaction.stats?.totalSales || transaction.amount || transaction.saleAmount || 0)).toLocaleString()}
+                            {(transaction.currency || 'SAR')} {((transaction.stats?.['Total Sales'] || transaction.stats?.totalSales || transaction.amount || transaction.saleAmount || 0)).toLocaleString()}
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
-                            SAR {((transaction['Referred User Commission'] || transaction.ReferredUserCommission || transaction.commission || 0)).toLocaleString()}
+                            {(transaction.currency || 'SAR')} {((transaction['Referred User Commission'] || transaction.ReferredUserCommission || transaction.commission || 0)).toLocaleString()}
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-semibold">
+                              {transaction.currency || 'SAR'}
+                            </span>
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap">
                             {getStatusBadge(transaction.status)}
@@ -778,7 +969,7 @@ const AffiliateManagement = () => {
                     ) : (
                       <tr>
                         <td
-                          colSpan="6"
+                          colSpan="7"
                           className="px-4 py-8 text-center text-gray-500"
                         >
                           No transactions found
@@ -819,8 +1010,8 @@ const AffiliateManagement = () => {
                   {selectedPayout.affiliateName || 'N/A'}
                 </p>
                 <p className="text-gray-700">
-                  <strong className="font-semibold">Amount:</strong> $
-                  {(selectedPayout.amount || 0).toLocaleString()}
+                  <strong className="font-semibold">Amount:</strong>{' '}
+                  {(selectedPayout.currency || 'SAR')} {(selectedPayout.amount || 0).toLocaleString()}
                 </p>
                 <p className="text-gray-700">
                   <strong className="font-semibold">Payment Method:</strong>{' '}
