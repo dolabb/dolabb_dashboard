@@ -67,6 +67,8 @@ const StatCard = ({ title, value, icon: Icon, color, delay = 0 }) => (
 const Dashboard = () => {
   const titleRef = useRef(null);
   const [loading, setLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [chartsLoading, setChartsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [dashboardData, setDashboardData] = useState({
     stats: null,
@@ -92,40 +94,71 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchDashboardData = async () => {
       setLoading(true);
+      setStatsLoading(true);
+      setChartsLoading(true);
       setError(null);
       
-      try {
-        const [
-          stats,
-          revenueTrends,
-          salesOverTime,
-          listingsStatus,
-          transactionTypes,
-          disputesStatus,
-          cashoutSummary,
-        ] = await Promise.all([
-          getDashboardStats(),
-          getRevenueTrends(),
-          getSalesOverTime(),
-          getListingsStatus(),
-          getTransactionTypes(),
-          getDisputesStatus(),
-          getCashoutRequestsSummary(),
+      // Helper function to fetch with timeout
+      const fetchWithTimeout = async (apiCall, timeout = 15000) => {
+        return Promise.race([
+          apiCall(),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Request timeout')), timeout)
+          ),
         ]);
+      };
 
-        setDashboardData({
-          stats: stats.success ? stats : null,
-          revenueTrends: revenueTrends.success ? revenueTrends : null,
-          salesOverTime: salesOverTime.success ? salesOverTime : null,
-          listingsStatus: listingsStatus.success ? listingsStatus : null,
-          transactionTypes: transactionTypes.success ? transactionTypes : null,
-          disputesStatus: disputesStatus.success ? disputesStatus : null,
-          cashoutSummary: cashoutSummary.success ? cashoutSummary : null,
+      // Helper function to safely fetch data
+      const safeFetch = async (apiCall, key) => {
+        try {
+          const response = await fetchWithTimeout(apiCall, 15000);
+          if (response && response.success) {
+            setDashboardData((prev) => ({ ...prev, [key]: response }));
+            return response;
+          }
+          return null;
+        } catch (err) {
+          console.error(`Error fetching ${key}:`, err);
+          return null;
+        }
+      };
+
+      try {
+        // Load stats first (most important) - show immediately
+        const statsResult = await safeFetch(getDashboardStats, 'stats');
+        setStatsLoading(false);
+        if (statsResult) {
+          // If stats loaded, we can show the page even if charts are still loading
+          setLoading(false);
+        }
+
+        // Load charts progressively in parallel (non-blocking)
+        // Use Promise.allSettled so one failure doesn't block others
+        Promise.allSettled([
+          safeFetch(getRevenueTrends, 'revenueTrends'),
+          safeFetch(getSalesOverTime, 'salesOverTime'),
+          safeFetch(getListingsStatus, 'listingsStatus'),
+          safeFetch(getTransactionTypes, 'transactionTypes'),
+          safeFetch(getDisputesStatus, 'disputesStatus'),
+          safeFetch(getCashoutRequestsSummary, 'cashoutSummary'),
+        ]).then(() => {
+          setChartsLoading(false);
+          setLoading(false);
         });
+
+        // Fallback: if stats fail, still try to show something after timeout
+        if (!statsResult) {
+          setTimeout(() => {
+            setStatsLoading(false);
+            setLoading(false);
+          }, 5000);
+        }
+
       } catch (err) {
         console.error('Error fetching dashboard data:', err);
-        setError('Failed to load dashboard data. Please try again.');
-      } finally {
+        setError('Failed to load some dashboard data. Please refresh the page.');
+        setStatsLoading(false);
+        setChartsLoading(false);
         setLoading(false);
       }
     };
@@ -319,12 +352,47 @@ const Dashboard = () => {
     return null;
   };
 
-  if (loading) {
+  // Skeleton Loader Component
+  const SkeletonCard = () => (
+    <div className='bg-white rounded-lg shadow-md p-4 sm:p-6 border border-gray-200 animate-pulse'>
+      <div className='flex items-center justify-between'>
+        <div className='flex-1'>
+          <div className='h-4 bg-gray-200 rounded w-24 mb-3'></div>
+          <div className='h-8 bg-gray-300 rounded w-32'></div>
+        </div>
+        <div className='h-10 w-10 bg-gray-200 rounded'></div>
+      </div>
+    </div>
+  );
+
+  const SkeletonChart = () => (
+    <div className='bg-white rounded-lg shadow-md p-4 sm:p-6 border border-gray-200 animate-pulse'>
+      <div className='h-6 bg-gray-200 rounded w-48 mb-4'></div>
+      <div className='h-[300px] bg-gray-100 rounded'></div>
+    </div>
+  );
+
+  if (statsLoading) {
     return (
-      <div className='flex items-center justify-center min-h-screen'>
-        <div className='text-center'>
-          <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4'></div>
-          <p className='text-gray-600'>Loading dashboard data...</p>
+      <div className='space-y-4 sm:space-y-6'>
+        {/* Header Skeleton */}
+        <div className='animate-pulse'>
+          <div className='h-8 bg-gray-200 rounded w-64 mb-2'></div>
+          <div className='h-4 bg-gray-200 rounded w-96'></div>
+        </div>
+
+        {/* Stats Cards Skeleton */}
+        <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6'>
+          {[...Array(8)].map((_, index) => (
+            <SkeletonCard key={index} />
+          ))}
+        </div>
+
+        {/* Charts Skeleton */}
+        <div className='grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6'>
+          {[...Array(6)].map((_, index) => (
+            <SkeletonChart key={index} />
+          ))}
         </div>
       </div>
     );
@@ -364,18 +432,21 @@ const Dashboard = () => {
       {/* Charts Section */}
       <div className='grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6'>
         {/* Revenue and Users Trend */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.8 }}
-          className='bg-white rounded-lg shadow-md p-4 sm:p-6 border border-gray-200'
-        >
-          <h2 className='text-lg sm:text-xl font-semibold text-gray-900 mb-4 whitespace-nowrap flex items-center gap-2'>
-            <FaChartLine className='text-green-600' />
-            Revenue & Users Trend
-          </h2>
-          <ResponsiveContainer width='100%' height={300}>
-            <LineChart data={revenueData}>
+        {chartsLoading && !dashboardData.revenueTrends ? (
+          <SkeletonChart />
+        ) : (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.8 }}
+            className='bg-white rounded-lg shadow-md p-4 sm:p-6 border border-gray-200'
+          >
+            <h2 className='text-lg sm:text-xl font-semibold text-gray-900 mb-4 whitespace-nowrap flex items-center gap-2'>
+              <FaChartLine className='text-green-600' />
+              Revenue & Users Trend
+            </h2>
+            <ResponsiveContainer width='100%' height={300}>
+              <LineChart data={revenueData}>
               <CartesianGrid strokeDasharray='3 3' stroke='#e5e7eb' />
               <XAxis dataKey='month' stroke='#6b7280' />
               <YAxis stroke='#6b7280' />
@@ -398,20 +469,24 @@ const Dashboard = () => {
             </LineChart>
           </ResponsiveContainer>
         </motion.div>
+        )}
 
         {/* Sales Over Time */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.9 }}
-          className='bg-white rounded-lg shadow-md p-4 sm:p-6 border border-gray-200'
-        >
-          <h2 className='text-lg sm:text-xl font-semibold text-gray-900 mb-4 whitespace-nowrap flex items-center gap-2'>
-            <FaShoppingCart className='text-yellow-600' />
-            Sales Over Time
-          </h2>
-          <ResponsiveContainer width='100%' height={300}>
-            <BarChart data={salesData}>
+        {chartsLoading && !dashboardData.salesOverTime ? (
+          <SkeletonChart />
+        ) : (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.9 }}
+            className='bg-white rounded-lg shadow-md p-4 sm:p-6 border border-gray-200'
+          >
+            <h2 className='text-lg sm:text-xl font-semibold text-gray-900 mb-4 whitespace-nowrap flex items-center gap-2'>
+              <FaShoppingCart className='text-yellow-600' />
+              Sales Over Time
+            </h2>
+            <ResponsiveContainer width='100%' height={300}>
+              <BarChart data={salesData}>
               <CartesianGrid strokeDasharray='3 3' stroke='#e5e7eb' />
               <XAxis dataKey='month' stroke='#6b7280' />
               <YAxis stroke='#6b7280' />
@@ -420,22 +495,26 @@ const Dashboard = () => {
             </BarChart>
           </ResponsiveContainer>
         </motion.div>
+        )}
 
         {/* Listings Status */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 1.0 }}
-          className='bg-white rounded-lg shadow-md p-4 sm:p-6 border border-gray-200'
-        >
-          <h2 className='text-lg sm:text-xl font-semibold text-gray-900 mb-4 whitespace-nowrap flex items-center gap-2'>
-            <FaBox className='text-blue-600' />
-            Listings Status
-          </h2>
-          <ResponsiveContainer width='100%' height={300}>
-            <PieChart>
-              <Pie
-                data={listingsStatusData}
+        {chartsLoading && !dashboardData.listingsStatus ? (
+          <SkeletonChart />
+        ) : (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 1.0 }}
+            className='bg-white rounded-lg shadow-md p-4 sm:p-6 border border-gray-200'
+          >
+            <h2 className='text-lg sm:text-xl font-semibold text-gray-900 mb-4 whitespace-nowrap flex items-center gap-2'>
+              <FaBox className='text-blue-600' />
+              Listings Status
+            </h2>
+            <ResponsiveContainer width='100%' height={300}>
+              <PieChart>
+                <Pie
+                  data={listingsStatusData}
                 cx='50%'
                 cy='50%'
                 labelLine={false}
@@ -465,22 +544,26 @@ const Dashboard = () => {
             </PieChart>
           </ResponsiveContainer>
         </motion.div>
+        )}
 
         {/* Transaction Types */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 1.1 }}
-          className='bg-white rounded-lg shadow-md p-4 sm:p-6 border border-gray-200'
-        >
-          <h2 className='text-lg sm:text-xl font-semibold text-gray-900 mb-4 whitespace-nowrap flex items-center gap-2'>
-            <FaFileInvoiceDollar className='text-purple-600' />
-            Transaction Types
-          </h2>
-          <ResponsiveContainer width='100%' height={300}>
-            <PieChart>
-              <Pie
-                data={transactionTypesData}
+        {chartsLoading && !dashboardData.transactionTypes ? (
+          <SkeletonChart />
+        ) : (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 1.1 }}
+            className='bg-white rounded-lg shadow-md p-4 sm:p-6 border border-gray-200'
+          >
+            <h2 className='text-lg sm:text-xl font-semibold text-gray-900 mb-4 whitespace-nowrap flex items-center gap-2'>
+              <FaFileInvoiceDollar className='text-purple-600' />
+              Transaction Types
+            </h2>
+            <ResponsiveContainer width='100%' height={300}>
+              <PieChart>
+                <Pie
+                  data={transactionTypesData}
                 cx='50%'
                 cy='50%'
                 labelLine={false}
@@ -499,22 +582,26 @@ const Dashboard = () => {
             </PieChart>
           </ResponsiveContainer>
         </motion.div>
+        )}
 
         {/* Disputes Status */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 1.2 }}
-          className='bg-white rounded-lg shadow-md p-4 sm:p-6 border border-gray-200'
-        >
-          <h2 className='text-lg sm:text-xl font-semibold text-gray-900 mb-4 whitespace-nowrap flex items-center gap-2'>
-            <FaGavel className='text-red-600' />
-            Disputes Status
-          </h2>
-          <ResponsiveContainer width='100%' height={300}>
-            <PieChart>
-              <Pie
-                data={disputesData}
+        {chartsLoading && !dashboardData.disputesStatus ? (
+          <SkeletonChart />
+        ) : (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 1.2 }}
+            className='bg-white rounded-lg shadow-md p-4 sm:p-6 border border-gray-200'
+          >
+            <h2 className='text-lg sm:text-xl font-semibold text-gray-900 mb-4 whitespace-nowrap flex items-center gap-2'>
+              <FaGavel className='text-red-600' />
+              Disputes Status
+            </h2>
+            <ResponsiveContainer width='100%' height={300}>
+              <PieChart>
+                <Pie
+                  data={disputesData}
                 cx='50%'
                 cy='50%'
                 labelLine={false}
@@ -545,22 +632,26 @@ const Dashboard = () => {
             </PieChart>
           </ResponsiveContainer>
         </motion.div>
+        )}
 
         {/* Cashout Requests */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 1.3 }}
-          className='bg-white rounded-lg shadow-md p-4 sm:p-6 border border-gray-200'
-        >
-          <h2 className='text-lg sm:text-xl font-semibold text-gray-900 mb-4 whitespace-nowrap flex items-center gap-2'>
-            <FaClock className='text-orange-600' />
-            Cashout Requests
-          </h2>
-          <ResponsiveContainer width='100%' height={300}>
-            <PieChart>
-              <Pie
-                data={cashoutData}
+        {chartsLoading && !dashboardData.cashoutSummary ? (
+          <SkeletonChart />
+        ) : (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 1.3 }}
+            className='bg-white rounded-lg shadow-md p-4 sm:p-6 border border-gray-200'
+          >
+            <h2 className='text-lg sm:text-xl font-semibold text-gray-900 mb-4 whitespace-nowrap flex items-center gap-2'>
+              <FaClock className='text-orange-600' />
+              Cashout Requests
+            </h2>
+            <ResponsiveContainer width='100%' height={300}>
+              <PieChart>
+                <Pie
+                  data={cashoutData}
                 cx='50%'
                 cy='50%'
                 labelLine={false}
@@ -591,6 +682,7 @@ const Dashboard = () => {
             </PieChart>
           </ResponsiveContainer>
         </motion.div>
+        )}
       </div>
 
       

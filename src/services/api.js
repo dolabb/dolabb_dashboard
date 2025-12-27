@@ -599,10 +599,13 @@ export const updateDispute = async (disputeId, disputeData) => {
  * Close Dispute
  * PUT /api/admin/disputes/{dispute_id}/close/
  */
-export const closeDispute = async (disputeId, resolution = null) => {
+export const closeDispute = async (disputeId, resolution = null, orderId = null) => {
+  const body = {};
+  if (resolution) body.resolution = resolution;
+  if (orderId) body.order_id = orderId;
   return apiRequest(`/api/admin/disputes/${disputeId}/close/`, {
     method: 'PUT',
-    body: JSON.stringify(resolution ? { resolution } : {}),
+    body: JSON.stringify(body),
   });
 };
 
@@ -615,17 +618,27 @@ export const getDisputeDetails = async disputeId => {
 };
 
 /**
- * Add Dispute Message/Note
- * POST /api/admin/disputes/{dispute_id}/messages/
+ * Add Dispute Comment (Admin)
+ * POST /api/admin/disputes/{dispute_id}/comments/
  */
-export const addDisputeMessage = async (
-  disputeId,
-  message,
-  type = 'admin_note'
-) => {
-  return apiRequest(`/api/admin/disputes/${disputeId}/messages/`, {
+export const addDisputeComment = async (disputeId, message, orderId) => {
+  const endpoint = `/api/admin/disputes/${disputeId}/comments/`;
+  const payload = { message, order_id: orderId };
+  const fullUrl = `${API_BASE_URL}${endpoint}`;
+  
+  console.log('=== addDisputeComment API Call ===');
+  console.log('Full API URL:', fullUrl);
+  console.log('API Endpoint:', endpoint);
+  console.log('HTTP Method: POST');
+  console.log('Request Payload:', JSON.stringify(payload, null, 2));
+  console.log('Dispute ID:', disputeId);
+  console.log('Message:', message);
+  console.log('Order ID:', orderId);
+  console.log('==================================');
+  
+  return apiRequest(endpoint, {
     method: 'POST',
-    body: JSON.stringify({ message, type }),
+    body: JSON.stringify(payload),
   });
 };
 
